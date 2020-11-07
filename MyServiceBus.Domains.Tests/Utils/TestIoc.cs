@@ -24,7 +24,7 @@ namespace MyServiceBus.Domains.Tests.Utils
 
             ioc.Register<IMessagesToPersistQueue>(new MessagesToPersistQueueForTests());
             
-            ioc.RegisterMyNoServiceBusDomainServices();
+            ioc.RegisterMyNoServiceBusDomainServices(ServerMode.Server);
 
             var testSettings = new TestSettings(); 
             ioc.Register(testSettings);
@@ -66,8 +66,8 @@ namespace MyServiceBus.Domains.Tests.Utils
 
         public static void SetCurrentTime(this MyIoc ioc, DateTime now)
         {
-            var backgroundExecutor = ioc.GetService<MyServiceBusBackgroundExecutor>();
-            backgroundExecutor.ExecuteAsync().AsTask().Wait();
+            var backgroundExecutor = ioc.GetService<IMyServerBusBackgroundExecutor>();
+            backgroundExecutor.GarbageCollect().AsTask().Wait();
             backgroundExecutor.PersistAsync().AsTask().Wait();
         }
 

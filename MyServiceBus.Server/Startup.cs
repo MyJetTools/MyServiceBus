@@ -29,12 +29,13 @@ namespace MyServiceBus.Server
         public IConfiguration Configuration { get; }
 
         public static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(1);
+        
+        public static SettingsModel Settings { get; internal set; }
 
         public void ConfigureServices(IServiceCollection services)
         {
 
             services.AddCodeFirstGrpc();
-            var settings = MySettingsReader.SettingsReader.GetSettings<SettingsModel>(".myservicebus");
             
             services.AddApplicationInsightsTelemetry(Configuration);
 
@@ -46,7 +47,7 @@ namespace MyServiceBus.Server
             services.AddSignalR()
                 .AddMessagePackProtocol(options =>
                 {
-                    options.FormatterResolvers = new List<MessagePack.IFormatterResolver>()
+                    options.FormatterResolvers = new List<MessagePack.IFormatterResolver>
                     {
                         MessagePack.Resolvers.StandardResolver.Instance
                     };
@@ -55,40 +56,32 @@ namespace MyServiceBus.Server
             services.AddSwaggerDocument(o => o.Title = "MyServiceBus");
             
             var ioc = new MyIoc();
+            var serverMode = Settings.GetServerMode();
+            ioc.Register<IMyServiceBusSettings>(Settings);
+            ioc.RegisterMyNoServiceBusDomainServices(serverMode);
 
-            ioc.Register<IMyServiceBusSettings>(settings);
-            ioc.RegisterMyNoServiceBusDomainServices();
+            if (serverMode == ServerMode.Server)
+            {
+                Console.WriteLine("Server is in SERVER mode");
+                var cloudStorage = CloudStorageAccount.Parse(Settings.QueuesConnectionString);
+                var messagesConnectionString = CloudStorageAccount.Parse(Settings.MessagesConnectionString);
+                ioc.BindTopicsPersistentStorage(cloudStorage);
+                ioc.BindMessagesPersistentStorage(messagesConnectionString);
+                
+                ioc.Register<IMessagesToPersistQueue, MessagesToPersistQueue>();
 
-            var cloudStorage = CloudStorageAccount.Parse(settings.QueuesConnectionString);
-            
-            var messagesConnectionString = CloudStorageAccount.Parse(settings.MessagesConnectionString);
+            }
+            else
+            {
+                Console.WriteLine("Server is in PROXY mode");
+                ioc.Register<IMessagesToPersistQueue, MessagesToPersistInProxyMode>();
+            }
 
-            ioc.BindTopicsPersistentStorage(cloudStorage);
-            ioc.BindMessagesPersistentStorage(messagesConnectionString);
+
             ioc.BindServerServices();
-            
-            ioc.Register<IMessagesToPersistQueue, MessagesToPersistQueue>();
             
             
             ServiceLocator.Init(ioc);
-            ServiceLocator.TcpServer    = new MyServerTcpSocket<IServiceBusTcpContract>(new IPEndPoint(IPAddress.Any, 6421))
-                .RegisterSerializer(()=> new MyServiceBusTcpSerializer())
-                .SetService(()=>new MyServiceBusTcpContext())
-                .AddLog((ctx, data) =>
-                {
-                    if (ctx == null)
-                    {
-                        Console.WriteLine($"{DateTime.UtcNow}: "+data);    
-                    }
-                    else
-                    {
-                        Console.WriteLine($"{DateTime.UtcNow}: ClientId: {ctx.Id}. "+data);
-                    }
-                    
-                }); 
-            
-            ServiceLocator.TcpServer.Start();
-            
             
         }
 

@@ -76,4 +76,24 @@ namespace MyServiceBus.Domains.Persistence
         }
 
     }
+
+
+    public class MessagesToPersistInProxyMode : IMessagesToPersistQueue
+    {
+        public void EnqueueToPersist(string topicId, IEnumerable<MessageContent> messages)
+        {
+            
+        }
+
+        public IReadOnlyList<MessageContent> GetMessagesToPersist(string topicId)
+        {
+            return Array.Empty<MessageContent>();
+        }
+
+        public IReadOnlyList<(string topic, int count)> GetMessagesToPersistCount()
+        {
+            return Array.Empty<(string topic, int count)>();
+        }
+    }
+    
 }

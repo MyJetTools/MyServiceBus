@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ using MyServiceBus.Domains.Metrics;
 using MyServiceBus.Domains.Persistence;
 using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
-using MyServiceBus.Server.Services;
+using MyServiceBus.Server.Tcp;
 using MyServiceBus.TcpContracts;
 using MyTcpSockets;
 
@@ -45,18 +46,19 @@ namespace MyServiceBus.Server
             Console.WriteLine($"AspNetEnvironment: {AspNetEnvironment}");
             Console.WriteLine($"Host: {Host}");
             Console.WriteLine($"StartedAt: {StartedAt}");
-            Console.WriteLine($"Port (http1 and http2): 6123");
-            Console.WriteLine($"Port (http2): 6124");
+            Console.WriteLine("Port (http1 and http2): "+Startup.Settings.ListenHttpPort);
+            Console.WriteLine("Port (http2): "+Startup.Settings.ListenHttpPort);
+            Console.WriteLine("Port (TCP): "+Startup.Settings.ListenTcpPort);
             Console.WriteLine();
         }
 
-        public static string AppName { get; private set; }
-        public static string AppVersion { get; private set; }
+        public static string AppName { get; }
+        public static string AppVersion { get; }
 
-        public static DateTime StartedAt { get; private set; }
+        public static DateTime StartedAt { get; }
 
-        public static string AspNetEnvironment { get; private set; }
-        public static string Host { get; private set; }
+        public static string AspNetEnvironment { get; }
+        public static string Host { get; }
         public static SessionsList SessionsList { get; private set; }
         public static TopicsManagement TopicsManagement { get; private set; }
         public static TopicsList TopicsList { get; private set; }
@@ -64,20 +66,15 @@ namespace MyServiceBus.Server
         public static MyServiceBusPublisher MyServiceBusPublisher { get; private set; }
         public static MyServiceBusSubscriber Subscriber { get; private set; }
 
-        private static MyServiceBusBackgroundExecutor _myServiceBusBackgroundExecutor;
-        public static MyServiceBusDeliveryHandler MyServiceBusDeliveryHandler { get; private set; }
-        public static MyServerTcpSocket<IServiceBusTcpContract> TcpServer { get; internal set; }
+        private static IMyServerBusBackgroundExecutor _myServiceBusBackgroundExecutor;
         public static IMessagesToPersistQueue MessagesToPersistQueue { get; private set; }
         public static MessageContentCacheByTopic CacheByTopic { get; private set; }
         
         public static readonly MessagesPerSecondByTopic MessagesPerSecondByTopic = new MessagesPerSecondByTopic();
 
-        public static PrometheusMetrics PrometheusMetrics { get; private set; }
-        
-
-
         public static void Init(IServiceResolver serviceResolver)
         {
+     
             TopicsManagement = serviceResolver.GetService<TopicsManagement>();
             TopicsList = serviceResolver.GetService<TopicsList>();
             
@@ -89,17 +86,14 @@ namespace MyServiceBus.Server
             SessionsList = serviceResolver.GetService<SessionsList>();
 
             MessagesToPersistQueue = serviceResolver.GetService<IMessagesToPersistQueue>();
-
-
-            MyServiceBusDeliveryHandler = serviceResolver.GetService<MyServiceBusDeliveryHandler>();
             
             _myServiceBusBackgroundExecutor = serviceResolver.GetService<MyServiceBusBackgroundExecutor>();
 
             CacheByTopic = serviceResolver.GetService<MessageContentCacheByTopic>();
 
-            PrometheusMetrics = serviceResolver.GetService<PrometheusMetrics>();
-
             DataInitializer.InitAsync(serviceResolver).Wait();
+            
+            InitTcpListenPort();
         }
         
         
@@ -110,11 +104,42 @@ namespace MyServiceBus.Server
         private static readonly MyTaskTimer TimerStatistic = new MyTaskTimer(1000);
 
 
+        public static MyServerTcpSocket<IServiceBusTcpContract> TcpServer { get; private set; }
+        private static void InitTcpListenPort()
+        {
+            TcpServer = new MyServerTcpSocket<IServiceBusTcpContract>(new IPEndPoint(IPAddress.Any, Startup.Settings.GetTcpPort()))
+                .RegisterSerializer(()=> new MyServiceBusTcpSerializer())
+                .SetService(()=>new MyServiceBusTcpContext())
+                .AddLog((ctx, data) =>
+                {
+                    if (ctx == null)
+                    {
+                        Console.WriteLine($"{DateTime.UtcNow}: "+data);    
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{DateTime.UtcNow}: ClientId: {ctx.Id}. "+data);
+                    }
+                    
+                }); 
+        }
+        
+        //If we are in Proxy Mode
+        public static MyClientTcpSocket<IServiceBusTcpContract> TcpClient { get; private set; }
+
+
+        private static void InitProxyTcpClient()
+        {
+            
+        }
+        
         public static void Start()
         {
 
+            TcpServer.Start();
+            
             TimerGarbageCollector.Register("Long pooling subscribers GarbageCollect",
-                _myServiceBusBackgroundExecutor.ExecuteAsync);
+                _myServiceBusBackgroundExecutor.GarbageCollect);
             
             TimerPersistent.Register("Long pooling subscribers Persist",
                 _myServiceBusBackgroundExecutor.PersistAsync);

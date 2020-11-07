@@ -8,6 +8,9 @@ using MyServiceBus.Domains.Topics;
 
 namespace MyServiceBus.Domains
 {
+    
+    
+    
     public static class DataInitializer
     {
 

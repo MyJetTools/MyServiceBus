@@ -4,6 +4,6 @@ namespace MyServiceBus.Domains
     {
         public bool ShuttingDown { get; set; }
 
-        public int PublishRequestsAmountAreBeingProcessed;
+        public int PublishRequestsAmountAreBeingProcessed { get; set; }
     }
 }

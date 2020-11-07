@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace MyServiceBus.Server
 {
@@ -22,32 +16,41 @@ namespace MyServiceBus.Server
 
         // Additional configuration is required to successfully run gRPC on macOS.
         // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
+        public static IHostBuilder CreateHostBuilder(string[] args)
+        {
+            Startup.Settings = SettingsReader.Read();
+
+            var httpPort = Startup.Settings.GetHttpPort();
+
+            var http2Port = Startup.Settings.GetHttp2Port();
+
+            return Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.ConfigureKestrel(options =>
                         {
-                            
-                            options.Listen(IPAddress.Any,  6123,
-                                o => o.Protocols = HttpProtocols.Http1AndHttp2);
-                            
-                            options.Listen(IPAddress.Any,  6124,
-                                o => o.Protocols = HttpProtocols.Http2);
-                            
-                        }) 
 
-                        .UseStartup<Startup>() 
-                        
+                            options.Listen(IPAddress.Any, httpPort,
+                                o => o.Protocols = HttpProtocols.Http1AndHttp2);
+
+                            options.Listen(IPAddress.Any, http2Port,
+                                o => o.Protocols = HttpProtocols.Http2);
+
+                        })
+
+                        .UseStartup<Startup>()
+
                         .ConfigureLogging((context, logging) =>
                         {
                             // clear all previously registered providers
-                           // logging.ClearProviders();
+                            // logging.ClearProviders();
 
                             // now register everything you *really* want
                             // …
-                        });;
+                        });
+                    ;
                 });
+        }
+
     }
-    
 }

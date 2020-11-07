@@ -7,9 +7,15 @@ using MyServiceBus.Domains.Topics;
 
 namespace MyServiceBus.Domains
 {
+    
+    public enum ServerMode
+    {
+        Server, Proxy
+    }
+
     public static class ServicesBinder
     {
-        public static void RegisterMyNoServiceBusDomainServices(this IServiceRegistrator sr)
+        public static void RegisterMyNoServiceBusDomainServices(this IServiceRegistrator sr, ServerMode serverMode)
         {
             
             sr.Register<TopicsList>();
@@ -17,7 +23,16 @@ namespace MyServiceBus.Domains
             
             sr.Register<MyServiceBusPublisher>();
             sr.Register<MyServiceBusSubscriber>();
-            sr.Register<MyServiceBusBackgroundExecutor>();
+
+            if (serverMode == ServerMode.Server)
+            {
+                sr.Register<IMyServerBusBackgroundExecutor, MyServiceBusBackgroundExecutor>();
+            }
+            else
+            {
+                sr.Register<IMyServerBusBackgroundExecutor, MyServiceBusBackgroundExecutor>();
+            }
+            
             sr.Register<MessageContentCacheByTopic>();
             
             sr.Register<TopicsAndQueuesPersistenceProcessor>();

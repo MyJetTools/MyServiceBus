@@ -6,7 +6,16 @@ using MyServiceBus.Domains.Topics;
 
 namespace MyServiceBus.Domains.Execution
 {
-    public class MyServiceBusBackgroundExecutor
+    
+
+
+    public interface IMyServerBusBackgroundExecutor
+    {
+        ValueTask GarbageCollect();
+        ValueTask PersistAsync();
+    }
+    
+    public class MyServiceBusBackgroundExecutor : IMyServerBusBackgroundExecutor
     {
 
         private readonly MyServiceBusDeliveryHandler _myServiceBusDeliveryHandler;
@@ -25,7 +34,7 @@ namespace MyServiceBus.Domains.Execution
             _messageContentPersistentProcessor = messageContentPersistentProcessor;
         }
 
-        public async ValueTask ExecuteAsync()
+        public async ValueTask GarbageCollect()
         {
             
             var topics = _topicsList.Get();
@@ -35,7 +44,6 @@ namespace MyServiceBus.Domains.Execution
                 await _messageContentPersistentProcessor.GarbageCollectAsync(topic);
                 await _myServiceBusDeliveryHandler.SendMessagesAsync(topic);
             }
-            
         }
 
 
@@ -50,7 +58,20 @@ namespace MyServiceBus.Domains.Execution
                 await _messageContentPersistentProcessor.PersistMessageContentInBackgroundAsync(topic);
             }
         }
-        
-        
     }
+
+
+    public class MyServiceBusBackgroundProxyModelExecutor : IMyServerBusBackgroundExecutor
+    {
+        public ValueTask GarbageCollect()
+        {
+            throw new NotImplementedException();
+        }
+
+        public ValueTask PersistAsync()
+        {
+            throw new NotImplementedException();
+        }
+    }
+    
 }
