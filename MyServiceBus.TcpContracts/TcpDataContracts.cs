@@ -14,7 +14,7 @@ namespace MyServiceBus.TcpContracts
 
     }
 
-    
+
     public interface IServiceBusTcpContract
     {
         void Serialize(Stream stream, int protocolVersion, int packetVersion);
@@ -23,40 +23,40 @@ namespace MyServiceBus.TcpContracts
 
     public class PingContract : IServiceBusTcpContract
     {
-        
+
         public static readonly PingContract Instance = new PingContract();
-            
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
         }
 
         public ValueTask DeserializeAsync(TcpDataReader dataReader, int protocolVersion, int packetVersion, CancellationToken ct)
         {
-            return new ValueTask(); 
+            return new ValueTask();
         }
     }
 
     public class PongContract : IServiceBusTcpContract
     {
         public static readonly PongContract Instance = new PongContract();
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
-         
+
         }
 
         public ValueTask DeserializeAsync(TcpDataReader dataReader, int protocolVersion, int packetVersion, CancellationToken ct)
         {
-            return new ValueTask(); 
+            return new ValueTask();
         }
     }
 
-    
+
     public class GreetingContract : IServiceBusTcpContract
     {
         public string Name { get; set; }
         public int ProtocolVersion { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(Name);
@@ -69,16 +69,16 @@ namespace MyServiceBus.TcpContracts
             ProtocolVersion = await dataReader.ReadIntAsync(ct);
         }
     }
-    
+
     public class PublishContract : IServiceBusTcpContract
     {
         public string TopicId { get; set; }
         public long RequestId { get; set; }
-        
+
         public byte ImmediatePersist { get; set; }
-        
+
         public IReadOnlyList<byte[]> Data { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -94,9 +94,9 @@ namespace MyServiceBus.TcpContracts
             Data = await dataReader.ReadListOfByteArrayAsync(ct);
             ImmediatePersist = await dataReader.ReadByteAsync(ct);
         }
-    }    
-    
-    
+    }
+
+
     public class PublishResponseContract : IServiceBusTcpContract
     {
         public long RequestId { get; set; }
@@ -111,14 +111,14 @@ namespace MyServiceBus.TcpContracts
 
             RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
         }
-    } 
-    
+    }
+
     public class SubscribeContract : IServiceBusTcpContract
     {
         public string TopicId { get; set; }
         public string QueueId { get; set; }
         public bool DeleteOnDisconnect { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -132,13 +132,13 @@ namespace MyServiceBus.TcpContracts
             QueueId = await dataReader.ReadPascalStringAsync(ct);
             DeleteOnDisconnect = await dataReader.ReadByteAsync(ct) == 1;
         }
-    }    
-    
+    }
+
     public class SubscribeResponseContract : IServiceBusTcpContract
     {
         public string TopicId { get; set; }
         public string QueueId { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -154,17 +154,17 @@ namespace MyServiceBus.TcpContracts
 
 
 
-    
+
     public class NewMessageContract : IServiceBusTcpContract
     {
         public class NewMessageData : IServiceBusTcpContract, IMyServiceBusMessage
         {
             public long Id { get; set; }
             public int AttemptNo { get; set; }
-            
+
             public ReadOnlyMemory<byte> Data { get; set; }
-            
-            
+
+
             public void Serialize(Stream stream, int protocolVersion, int packetVersion)
             {
                 if (packetVersion == 0)
@@ -206,13 +206,13 @@ namespace MyServiceBus.TcpContracts
             }
 
         }
-        
+
         public string TopicId { get; set; }
         public string QueueId { get; set; }
-        
+
         public long ConfirmationId { get; set; }
         public IEnumerable<NewMessageData> Data { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -231,14 +231,14 @@ namespace MyServiceBus.TcpContracts
     }
 
 
-    
+
     public class NewMessageConfirmationContract : IServiceBusTcpContract
     {
-        public string TopicId { get;  set; }
-        public string QueueId { get;  set; }
- 
-        public long ConfirmationId { get;  set; }
-        
+        public string TopicId { get; set; }
+        public string QueueId { get; set; }
+
+        public long ConfirmationId { get; set; }
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -257,9 +257,9 @@ namespace MyServiceBus.TcpContracts
 
     public class CreateTopicIfNotExistsContract : IServiceBusTcpContract
     {
-        public string TopicId { get;  set; }
+        public string TopicId { get; set; }
         public long MaxMessagesInCache { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -290,20 +290,24 @@ namespace MyServiceBus.TcpContracts
             ToId = await dataReader.ReadLongAsync(protocolVersion, ct);
         }
     }
-    
+
     public class MessagesConfirmationContract : IServiceBusTcpContract
     {
-        public string TopicId { get;  set; }
-        public string QueueId { get;  set; }
-        
-        public IReadOnlyList<MessagesInterval> Ok { get; set; }
+        public string TopicId { get; set; }
+        public string QueueId { get; set; }
+
+        public long ConfirmationId { get; set; }
+
+
+        //     public IReadOnlyList<MessagesInterval> Ok { get; set; }
         public IReadOnlyList<MessagesInterval> NotOk { get; set; }
-        
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
             stream.WritePascalString(QueueId);
-            stream.WriteArrayOfItems(Ok, protocolVersion, packetVersion);
+            stream.WriteLong(ConfirmationId);
+            //stream.WriteArrayOfItems(Ok, protocolVersion, packetVersion);
             stream.WriteArrayOfItems(NotOk, protocolVersion, packetVersion);
         }
 
@@ -311,19 +315,19 @@ namespace MyServiceBus.TcpContracts
         {
             TopicId = await dataReader.ReadPascalStringAsync(ct);
             QueueId = await dataReader.ReadPascalStringAsync(ct);
-
-            Ok = await dataReader.ReadArrayOfItemsAsync<MessagesInterval>(protocolVersion,packetVersion, ct);
-            NotOk = await dataReader.ReadArrayOfItemsAsync<MessagesInterval>(protocolVersion,packetVersion, ct);
+            ConfirmationId = await dataReader.ReadLongAsync(protocolVersion, ct);
+            //     Ok = await dataReader.ReadArrayOfItemsAsync<MessagesInterval>(protocolVersion, packetVersion, ct);
+            NotOk = await dataReader.ReadArrayOfItemsAsync<MessagesInterval>(protocolVersion, packetVersion, ct);
         }
     }
 
-    
+
     public class MessagesConfirmationAsFailContract : IServiceBusTcpContract
     {
-        public string TopicId { get;  set; }
-        public string QueueId { get;  set; }
-        public long ConfirmationId { get;  set; }
-        
+        public string TopicId { get; set; }
+        public string QueueId { get; set; }
+        public long ConfirmationId { get; set; }
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
             stream.WritePascalString(TopicId);
@@ -339,10 +343,10 @@ namespace MyServiceBus.TcpContracts
         }
     }
 
-    
+
     public class PacketVersionsContract : IServiceBusTcpContract
     {
-        
+
         private readonly Dictionary<byte, int> _versions = new Dictionary<byte, int>();
 
         public void SetPacketVersion(CommandType type, int version)
@@ -357,14 +361,14 @@ namespace MyServiceBus.TcpContracts
         }
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
-           stream.WriteByteFromStack((byte) _versions.Count);
+            stream.WriteByteFromStack((byte)_versions.Count);
 
-           foreach (var version in _versions)
-           {
-               stream.WriteByteFromStack(version.Key);
-               stream.WriteInt(version.Value);
-               
-           }
+            foreach (var version in _versions)
+            {
+                stream.WriteByteFromStack(version.Key);
+                stream.WriteInt(version.Value);
+
+            }
         }
 
         public async ValueTask DeserializeAsync(TcpDataReader dataReader, int protocolVersion, int packetVersion, CancellationToken ct)
@@ -378,19 +382,19 @@ namespace MyServiceBus.TcpContracts
                 _versions.Add(key, value);
             }
         }
-        
+
     }
 
 
     public class RejectConnectionContract : IServiceBusTcpContract
     {
-        
+
         public string Message { get; set; }
-        
-        
+
+
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
-            
+
             stream.WritePascalString(Message);
         }
 
@@ -408,5 +412,5 @@ namespace MyServiceBus.TcpContracts
             };
         }
     }
-    
+
 }

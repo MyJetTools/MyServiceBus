@@ -7,7 +7,8 @@ namespace MyServiceBus.TcpContracts
     
     public enum CommandType
     {
-        Ping, Pong, Greeting, Publish, PublishResponse, Subscribe, SubscribeResponse, NewMessage, NewMessageConfirmation, CreateTopicIfNotExists, 
+        Ping, Pong, Greeting, Publish, PublishResponse, 
+        Subscribe, SubscribeResponse, NewMessage, NewMessageConfirmation, CreateTopicIfNotExists, 
         MessagesConfirmation, PacketVersions, Reject, MessagesConfirmationAsFail
     }
     
@@ -26,7 +27,6 @@ namespace MyServiceBus.TcpContracts
                 [CommandType.NewMessage] = () => new NewMessageContract(),
                 [CommandType.NewMessageConfirmation] = () => new NewMessageConfirmationContract(),
                 [CommandType.CreateTopicIfNotExists] = () => new CreateTopicIfNotExistsContract(),
-                [CommandType.NewMessageConfirmation] = () => new NewMessageConfirmationContract(),
                 [CommandType.MessagesConfirmation] = () => new MessagesConfirmationContract(),
                 [CommandType.MessagesConfirmationAsFail] = () => new MessagesConfirmationAsFailContract(),
                 [CommandType.PacketVersions] = ()=>new PacketVersionsContract(),
