@@ -24,7 +24,7 @@ namespace MyServiceBus.TcpContracts
             return 0;
         }
 
-        private void HandlePacketVersions(PacketVersionsContract packetVersions)
+        public void HandlePacketVersions(PacketVersionsContract packetVersions)
         {
             foreach (var (key, value) in packetVersions.GetPackets())
                 _packetVersions.Add(key, value);  

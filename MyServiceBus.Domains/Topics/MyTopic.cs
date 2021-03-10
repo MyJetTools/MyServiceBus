@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
 using MyServiceBus.Domains.MessagesContent;
@@ -76,7 +77,7 @@ namespace MyServiceBus.Domains.Topics
             return _topicQueueList.CreateQueueIfNotExists(this, queueName, topicQueueType, MessageId.Value, overrideTopicQueueType);
         }
 
-        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<byte[]> messages, DateTime now)
+        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<(byte[], IReadOnlyList<KeyValuePair<string, string>>)> messages, DateTime now)
         {
             _requestsPerSecond++;
 
@@ -86,12 +87,16 @@ namespace MyServiceBus.Domains.Topics
             {
                 foreach (var message in messages)
                 {
-
                     var newMessage = new MessageContentGrpcModel
                     {
                         MessageId = generator.GetNextMessageId(),
                         Created = now,
-                        Data = message
+                        Data = message.Item1,
+                        MetaData = message.Item2.Select(itm => new MessageContentMetaDataItem
+                        {
+                            Key = itm.Key,
+                            Value = itm.Value
+                        }).ToArray()
                     };
 
                     newMessages.Add(newMessage);

@@ -68,7 +68,6 @@ namespace MyServiceBus.TcpClient
                 new SubscriberInfo(Log, topicId, queueId, topicQueueType, null, callback));
         }
 
-
         public Task PublishAsync(string topicId, byte[] valueToPublish, bool immediatelyPersist)
         {
             var connection = (MyServiceBusTcpContext) _clientTcpSocket.CurrentTcpContext;

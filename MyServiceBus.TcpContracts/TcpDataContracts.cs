@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
@@ -73,24 +74,91 @@ namespace MyServiceBus.TcpContracts
     
     public class PublishContract : IServiceBusTcpContract
     {
-        public string TopicId { get; set; }
-        public long RequestId { get; set; }
-        public byte ImmediatePersist { get; set; }
-        public IReadOnlyList<byte[]> Data { get; set; }
+        public string TopicId { get; private set; }
+        public long RequestId { get; private set; }
+        public byte ImmediatePersist { get; private set; }
+        public IReadOnlyList<(byte[] payload, IReadOnlyList<KeyValuePair<string, string>> metaData)> Data { get; private set; }
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
-            stream.WritePascalString(TopicId);
-            stream.WriteLong(RequestId, protocolVersion);
-            stream.WriteListOfByteArray(Data);
-            stream.WriteByte(ImmediatePersist);
+
+            if (packetVersion == 0)
+            {
+                stream.WritePascalString(TopicId);
+                stream.WriteLong(RequestId, protocolVersion);
+                var data = Data.Select(itm => itm.payload).ToList();
+                stream.WriteListOfByteArray(data);
+                stream.WriteByte(ImmediatePersist);
+            }
+            else
+            {
+                stream.WritePascalString(TopicId);
+                stream.WriteLong(RequestId, protocolVersion);
+                stream.SerializeList(Data, item =>
+                {
+                    
+                    stream.WriteByteArray(item.payload);
+                    stream.SerializeListWithCounterAsByte(item.metaData, metaData =>
+                    {
+                        stream.WritePascalString(metaData.Key);
+                        stream.WritePascalString(metaData.Value);
+                    });
+                });
+                stream.WriteByte(ImmediatePersist);
+            }
+            
         }
+        
+        public static readonly IReadOnlyList<KeyValuePair<string, string>> EmptyMetaData = Array.Empty<KeyValuePair<string, string>>();
 
         public async ValueTask DeserializeAsync(ITcpDataReader dataReader, int protocolVersion, int packetVersion, CancellationToken ct)
         {
-            TopicId = await dataReader.ReadPascalStringAsync(ct);
-            RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
-            Data = await dataReader.ReadListOfByteArrayAsync(ct);
-            ImmediatePersist = await dataReader.ReadAndCommitByteAsync(ct);
+            if (packetVersion == 0)
+            {
+                TopicId = await dataReader.ReadPascalStringAsync(ct);
+                RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
+                var payLoadAsByteArray = await dataReader.ReadListOfByteArrayAsync(ct);
+                Data = payLoadAsByteArray.Select(itm => (itm, EmptyMetaData)).ToList();
+                ImmediatePersist = await dataReader.ReadAndCommitByteAsync(ct);  
+            }
+            else
+            if (packetVersion == 1)
+            {
+                TopicId = await dataReader.ReadPascalStringAsync(ct);
+                RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
+                
+                Data = await dataReader.DeserializeList(async () =>
+                {
+                    var bytes = await dataReader.ReadByteArrayAsync(ct);
+
+                    var metaData = await dataReader.DeserializeListWithCounterAsByte(async () =>
+                    {
+                        var key = await dataReader.ReadPascalStringAsync(ct);
+                        var value = await dataReader.ReadPascalStringAsync(ct);
+                        return new KeyValuePair<string, string>(key, value);
+                    }, ct);
+
+                    return (bytes, metaData);
+
+                }, ct);
+                ImmediatePersist = await dataReader.ReadAndCommitByteAsync(ct);  
+            }
+            else
+            {
+                throw new UnsupportedPacketVersionException();
+            }
+
+        }
+
+        public static PublishContract Create(string topicId, long requestId, bool immediatePersist, 
+            IReadOnlyList<(byte[] data, IReadOnlyList<KeyValuePair<string, string>> metaData)> data)
+        {
+            return new PublishContract
+            {
+                TopicId = topicId,
+                RequestId = requestId,
+                ImmediatePersist = immediatePersist ? (byte) 1 : (byte) 0,
+                Data = data
+            };
         }
     }    
     
@@ -109,12 +177,6 @@ namespace MyServiceBus.TcpContracts
 
             RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
         }
-    }
-
-
-    public enum TopicQueueTypeTcpContract
-    {
-        
     }
     
     public class SubscribeContract : IServiceBusTcpContract
@@ -165,9 +227,7 @@ namespace MyServiceBus.TcpContracts
         {
             public long Id { get; set; }
             public int AttemptNo { get; set; }
-            
             public ReadOnlyMemory<byte> Data { get; set; }
-            
             
             public void Serialize(Stream stream, int protocolVersion, int packetVersion)
             {

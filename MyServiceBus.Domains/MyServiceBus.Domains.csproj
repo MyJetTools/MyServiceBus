@@ -7,7 +7,7 @@
     <ItemGroup>
       <PackageReference Include="DotNetCoreDecorators" Version="1.0.20" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.1" />
-      <PackageReference Include="MyServiceBus.Persistence.Grpc" Version="1.0.5" />
+      <PackageReference Include="MyServiceBus.Persistence.Grpc" Version="1.0.6" />
     </ItemGroup>
 
     <ItemGroup>

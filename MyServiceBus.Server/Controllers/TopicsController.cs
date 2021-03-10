@@ -25,6 +25,9 @@ namespace MyServiceBus.Server.Controllers
             return Json(GetAll());
         }
 
+        
+        private static readonly IReadOnlyList<KeyValuePair<string, string>> EmptyMetaData 
+            = Array.Empty<KeyValuePair<string, string>>();
         [HttpPost("Topics/NewMessage")]
         public async Task<IActionResult> NewMessage([FromForm][Required]long sessionId, [FromForm]string topicId, [FromForm][Required]string messageBase64, [FromForm][Required]bool persistImmediately)
         {
@@ -32,8 +35,12 @@ namespace MyServiceBus.Server.Controllers
             if (session == null)
                 return Forbid();
             
-            var bytes = Convert.FromBase64String(messageBase64); 
-            var result = await ServiceLocator.MyServiceBusPublisher.PublishAsync(session.SessionContext, topicId, new[] {bytes}, DateTime.UtcNow, persistImmediately);
+            var bytes = Convert.FromBase64String(messageBase64);
+
+            var messagesToPublish = new[] {(bytes, EmptyMetaData)};
+            
+            var result = await ServiceLocator.MyServiceBusPublisher.PublishAsync(session.SessionContext, topicId,
+                messagesToPublish, DateTime.UtcNow, persistImmediately);
             return Json(new {result});
         }
 

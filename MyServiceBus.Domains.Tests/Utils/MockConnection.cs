@@ -9,6 +9,7 @@ using MyServiceBus.Domains.QueueSubscribers;
 using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
 using MyServiceBus.Persistence.Grpc;
+using MyServiceBus.TcpContracts;
 
 namespace MyServiceBus.Domains.Tests.Utils
 {
@@ -65,7 +66,9 @@ namespace MyServiceBus.Domains.Tests.Utils
         public ExecutionResult PublishMessage( string topicName, byte[] message, DateTime dateTime, bool persistImmediately = false)
         {
             topicName = topicName.ToLower();
-            return Publisher.PublishAsync(MyServiceBusSessionContext, topicName, new[] {message}, dateTime, persistImmediately).Result;
+            var dataToPublish = new[] {(message, PublishContract.EmptyMetaData)};
+            return Publisher.PublishAsync(MyServiceBusSessionContext, topicName, 
+                dataToPublish, dateTime, persistImmediately).Result;
         }
         
         public MyTopic CreateTopic(string topicName)

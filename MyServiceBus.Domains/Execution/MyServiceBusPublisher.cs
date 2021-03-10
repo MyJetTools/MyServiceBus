@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
@@ -33,10 +34,9 @@ namespace MyServiceBus.Domains.Execution
         {
             Task.Run(()=>_messageContentPersistentProcessor.PersistMessageContentAsync(topic));
         }
-        
 
         public async ValueTask<ExecutionResult> PublishAsync(MyServiceBusSessionContext sessionContext, 
-            string topicId, IEnumerable<byte[]> messages, DateTime now, 
+            string topicId, IEnumerable<(byte[], IReadOnlyList<KeyValuePair<string, string>>)> messages, DateTime now, 
             bool persistImmediately)
         {
             

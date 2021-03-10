@@ -27,11 +27,11 @@ namespace MyServiceBus.TcpClient
 
         public readonly TaskCompletionSource<int> CommitTask = new TaskCompletionSource<int>();
 
-        private readonly List<byte[]> _payLoads = new List<byte[]>();
+        private readonly List<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> _payLoads = new ();
 
-        public IReadOnlyList<byte[]> PayLoads => _payLoads;
+        public IReadOnlyList<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> PayLoads => _payLoads;
 
-        public void Add(IEnumerable<byte[]> payLoads, bool immediatelyPersist)
+        public void AddRange(IEnumerable<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> payLoads, bool immediatelyPersist)
         {
             if (immediatelyPersist)
                 ImmediatelyPersist = true;
@@ -48,7 +48,16 @@ namespace MyServiceBus.TcpClient
             if (immediatelyPersist)
                 ImmediatelyPersist = true;
             
-            _payLoads.Add(payLoad);
+            _payLoads.Add((payLoad, Array.Empty<KeyValuePair<string, string>>()));
+            PayLoadSize++;
+        }
+        
+        public void Add(byte[] payLoad, bool immediatelyPersist, IReadOnlyList<KeyValuePair<string, string>> metaData)
+        {
+            if (immediatelyPersist)
+                ImmediatelyPersist = true;
+            
+            _payLoads.Add((payLoad, metaData));
             PayLoadSize++;
         }
 
@@ -118,6 +127,8 @@ namespace MyServiceBus.TcpClient
                 throw new Exception("Disconnected");
 
         }
+
+        private static IReadOnlyList<KeyValuePair<string, string>> _emptyPayload = Array.Empty<KeyValuePair<string, string>>();
         
         public Task AddMessage(long connectionId, string topicId, IEnumerable<byte[]> newPayLoad, bool immediatelyPersist)
         {
@@ -125,7 +136,9 @@ namespace MyServiceBus.TcpClient
             {
                 CheckIfItStillConnected(connectionId);
                 var payLoadPackage = GetNextPayloadPackage(topicId, connectionId);
-                payLoadPackage.Add(newPayLoad, immediatelyPersist);
+
+                var payLoad = newPayLoad.Select(itm => (itm, _emptyPayload));
+                payLoadPackage.AddRange(payLoad, immediatelyPersist);
                 return payLoadPackage.CommitTask.Task;
             }
         }

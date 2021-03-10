@@ -206,6 +206,7 @@ namespace MyServiceBus.TcpClient
         {
             var packetVersions = new PacketVersionsContract();
             packetVersions.SetPacketVersion(CommandType.NewMessage, 1);
+            packetVersions.SetPacketVersion(CommandType.Publish, 1);
             SendDataToSocket(packetVersions);
         }
 
@@ -229,17 +230,10 @@ namespace MyServiceBus.TcpClient
 
         public void Publish(PayloadPackage payloadPackage)
         {
-
-            var contract = new PublishContract
-            {
-                TopicId = payloadPackage.TopicId,
-                RequestId = payloadPackage.RequestId,
-                Data = payloadPackage.PayLoads,
-                ImmediatePersist = payloadPackage.ImmediatelyPersist ? (byte) 1 : (byte) 0
-            };
+           var contract = PublishContract.Create(payloadPackage.TopicId, payloadPackage.RequestId,
+                payloadPackage.ImmediatelyPersist, payloadPackage.PayLoads);
 
             SendDataToSocket(contract);
-
         }
 
         public void ConfirmMessages(IConfirmationContext ctx, IEnumerable<long> messagesToConfirm)

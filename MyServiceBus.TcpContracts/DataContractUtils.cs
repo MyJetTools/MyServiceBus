@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -106,7 +107,78 @@ namespace MyServiceBus.TcpContracts
 
             return result;
         }
+
+        public static void SerializeList<T>(this Stream stream, IReadOnlyList<T> data, Action<T> serializeItem)
+        {
+            var len = data.Count;
+            stream.WriteInt(len);
+
+            foreach (var itm in data)
+            {
+                serializeItem(itm);
+            }
+        }
         
+        public static void SerializeListWithCounterAsByte<T>(this Stream stream, IReadOnlyList<T> data, Action<T> serializeItem)
+        {
+            var len = (byte)data.Count;
+            stream.WriteByte(len);
+
+            foreach (var itm in data)
+            {
+                serializeItem(itm);
+            }
+        }
+
+
+        public static async ValueTask<IReadOnlyList<T>> DeserializeList<T>(this ITcpDataReader dataReader, Func<ValueTask<T>> deserializeItemAsync, CancellationToken t)
+        {
+            var len = await dataReader.ReadIntAsync(t);
+
+            var result = new T[len];
+            for (var i = 0; i < len; i++)
+            {
+                result[i] = await deserializeItemAsync();
+            }
+
+            return result;
+        }
+        
+        public static async ValueTask<IReadOnlyList<T>> DeserializeListWithCounterAsByte<T>(this ITcpDataReader dataReader, Func<ValueTask<T>> deserializeItemAsync, CancellationToken t)
+        {
+            var len = await dataReader.ReadAndCommitByteAsync(t);
+
+            var result = new T[len];
+            for (var i = 0; i < len; i++)
+            {
+                result[i] = await deserializeItemAsync();
+            }
+
+            return result;
+        }
+        
+
+        /*
+        public static void SerializePayloadWithMetaData(this Stream stream, 
+            IReadOnlyList<(byte[] payload, IReadOnlyList<KeyValuePair<string, string>> metadata)> data)
+        {
+            foreach (var itm in data)
+            {
+                stream.WriteByteArray(payload);
+
+                var metaDataLen = (byte)metadata.Count;
+                
+                stream.WriteByte(metaDataLen);
+
+                foreach (var (key, value) in metadata)
+                {
+                    stream.WritePascalString(key);
+                    stream.WritePascalString(value);
+                }
+            }
+
+        }
+        */
         
     }
 }

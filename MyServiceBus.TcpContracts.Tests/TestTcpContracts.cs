@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -101,13 +102,16 @@ namespace MyServiceBus.TcpContracts.Tests
         {
             var serializer = new MyServiceBusTcpSerializer();
 
-            var inContract = new PublishContract
-            {
-                TopicId = "MyName",
-                RequestId = 5,
-                Data = new [] {new byte[] {1, 2, 3}, new byte[] {4, 5, 6}, new byte[] {7, 8, 9}},
-                ImmediatePersist = 1
-            };
+            var inContract = PublishContract
+                .Create(
+                    "MyName", 
+                    5, true, 
+                    new[]
+                    {
+                        (new byte[] {1, 2, 3}, PublishContract.EmptyMetaData), 
+                        (new byte[] {4, 5, 6}, PublishContract.EmptyMetaData), 
+                        (new byte[] {7, 8, 9}, PublishContract.EmptyMetaData)
+                    });
 
             var dataReader = new TcpDataReader(2048);
             var rawData = serializer.Serialize(inContract);
@@ -127,13 +131,52 @@ namespace MyServiceBus.TcpContracts.Tests
            var d2 = result.Data.ToArray();
 
            Assert.AreEqual(d1.Length, d2.Length);
-           Assert.AreEqual(d1[0].ToArray()[0], d2[0].ToArray()[0]);
-           Assert.AreEqual(d1[1].ToArray()[0], d2[1].ToArray()[0]);
-           Assert.AreEqual(d1[2].ToArray()[0], d2[2].ToArray()[0]); 
+           Assert.AreEqual(d1[0].payload.ToArray()[0], d2[0].payload.ToArray()[0]);
+           Assert.AreEqual(d1[1].payload.ToArray()[0], d2[1].payload.ToArray()[0]);
+           Assert.AreEqual(d1[2].payload.ToArray()[0], d2[2].payload.ToArray()[0]); 
+        }
+        
+        [Test]
+        public async Task TestPublishContractWithMetaData()
+        {
+            var serializer = new MyServiceBusTcpSerializer();
 
+            var packetVersion = new PacketVersionsContract();
+            packetVersion.SetPacketVersion(CommandType.Publish, 1);
 
+            serializer.HandlePacketVersions(packetVersion);
 
- 
+            var inContract = PublishContract
+                .Create(
+                    "MyName", 
+                    5, true, 
+                    new[]
+                    {
+                        (new byte[] {1, 2, 3}, (IReadOnlyList<KeyValuePair<string,string>>)new[]{new KeyValuePair<string,string>("Key1","Value1")}), 
+                        (new byte[] {4, 5, 6}, new[]{new KeyValuePair<string,string>("Key2","Value2")}), 
+                        (new byte[] {7, 8, 9}, new[]{new KeyValuePair<string,string>("Key3","Value3")})
+                    });
+
+            var dataReader = new TcpDataReader(2048);
+            var rawData = serializer.Serialize(inContract);
+            await dataReader.NewPackageAsync(rawData);
+
+            var ct = new CancellationTokenSource();
+            
+            var res 
+                = await serializer.DeserializeAsync(dataReader, ct.Token);
+           
+            var result = (PublishContract) res;
+            Assert.AreEqual(inContract.TopicId, result.TopicId);
+            Assert.AreEqual(inContract.RequestId, result.RequestId);
+            Assert.AreEqual(inContract.ImmediatePersist, result.ImmediatePersist);
+            var d1 = inContract.Data.ToArray();
+            var d2 = result.Data.ToArray();
+
+            Assert.AreEqual(d1.Length, d2.Length);
+            Assert.AreEqual(d1[0].payload.ToArray()[0], d2[0].payload.ToArray()[0]);
+            Assert.AreEqual(d1[1].payload.ToArray()[0], d2[1].payload.ToArray()[0]);
+            Assert.AreEqual(d1[2].payload.ToArray()[0], d2[2].payload.ToArray()[0]); 
         }
 
         [Test]
