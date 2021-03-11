@@ -12,9 +12,6 @@ namespace MyServiceBus.Server.Grpc
 {
     public class PublisherApi : ControllerBase, IPublisherGrpcService
     {
-
-        private static readonly IReadOnlyList<KeyValuePair<string, string>> EmptyMetaData 
-            = Array.Empty<KeyValuePair<string, string>>();
         public async ValueTask<PublishMessageGrpcResponse> PublishMessageAsync(PublishMessageGrpcRequest request)
         {
 
@@ -28,7 +25,7 @@ namespace MyServiceBus.Server.Grpc
                 return ErrorGrpcResponses.SessionExpired;
 
             var messagesToPublish 
-                = request.Messages.Select(itm => (itm, _emptyMetaData: EmptyMetaData));
+                = request.Messages.Select(itm => (itm, (IReadOnlyDictionary<string, string>)null));
 
             var response = await ServiceLocator
                 .MyServiceBusPublisher

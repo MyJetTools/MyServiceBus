@@ -63,10 +63,10 @@ namespace MyServiceBus.Domains.Tests.Utils
         }
 
 
-        public ExecutionResult PublishMessage( string topicName, byte[] message, DateTime dateTime, bool persistImmediately = false)
+        public ExecutionResult PublishMessage( string topicName, byte[] payLoad, DateTime dateTime, bool persistImmediately = false)
         {
             topicName = topicName.ToLower();
-            var dataToPublish = new[] {(message, PublishContract.EmptyMetaData)};
+            var dataToPublish = new[] {(payLoad, (IReadOnlyDictionary<string, string>)null)};
             return Publisher.PublishAsync(MyServiceBusSessionContext, topicName, 
                 dataToPublish, dateTime, persistImmediately).Result;
         }

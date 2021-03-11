@@ -34,7 +34,6 @@ namespace MyServiceBus.TcpContracts.Tests
             tcpDataReader.CommitWrittenData(data.Length);
 
         }
-        
-        
+
     }
 }

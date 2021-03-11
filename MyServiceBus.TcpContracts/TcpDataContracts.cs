@@ -77,7 +77,7 @@ namespace MyServiceBus.TcpContracts
         public string TopicId { get; private set; }
         public long RequestId { get; private set; }
         public byte ImmediatePersist { get; private set; }
-        public IReadOnlyList<(byte[] payload, IReadOnlyList<KeyValuePair<string, string>> metaData)> Data { get; private set; }
+        public IReadOnlyList<(byte[] payload, IReadOnlyDictionary<string, string> metaData)> Data { get; private set; }
         public void Serialize(Stream stream, int protocolVersion, int packetVersion)
         {
 
@@ -107,8 +107,6 @@ namespace MyServiceBus.TcpContracts
             }
             
         }
-        
-        public static readonly IReadOnlyList<KeyValuePair<string, string>> EmptyMetaData = Array.Empty<KeyValuePair<string, string>>();
 
         public async ValueTask DeserializeAsync(ITcpDataReader dataReader, int protocolVersion, int packetVersion, CancellationToken ct)
         {
@@ -117,7 +115,7 @@ namespace MyServiceBus.TcpContracts
                 TopicId = await dataReader.ReadPascalStringAsync(ct);
                 RequestId = await dataReader.ReadLongAsync(protocolVersion, ct);
                 var payLoadAsByteArray = await dataReader.ReadListOfByteArrayAsync(ct);
-                Data = payLoadAsByteArray.Select(itm => (itm, EmptyMetaData)).ToList();
+                Data = payLoadAsByteArray.Select(itm => (itm, (IReadOnlyDictionary<string, string>)null)).ToList();
                 ImmediatePersist = await dataReader.ReadAndCommitByteAsync(ct);  
             }
             else
@@ -150,7 +148,7 @@ namespace MyServiceBus.TcpContracts
         }
 
         public static PublishContract Create(string topicId, long requestId, bool immediatePersist, 
-            IReadOnlyList<(byte[] data, IReadOnlyList<KeyValuePair<string, string>> metaData)> data)
+            IReadOnlyList<(byte[] data, IReadOnlyDictionary<string, string> metaData)> data)
         {
             return new PublishContract
             {
@@ -158,6 +156,19 @@ namespace MyServiceBus.TcpContracts
                 RequestId = requestId,
                 ImmediatePersist = immediatePersist ? (byte) 1 : (byte) 0,
                 Data = data
+            };
+        }
+        
+        
+        public static PublishContract Create(string topicId, long requestId, bool immediatePersist, 
+            IEnumerable<byte[]> payLoad)
+        {
+            return new PublishContract
+            {
+                TopicId = topicId,
+                RequestId = requestId,
+                ImmediatePersist = immediatePersist ? (byte) 1 : (byte) 0,
+                Data = payLoad.Select(bytes => (bytes, (IReadOnlyDictionary<string, string>)null)).ToList()
             };
         }
     }    

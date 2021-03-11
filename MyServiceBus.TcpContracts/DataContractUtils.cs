@@ -119,8 +119,16 @@ namespace MyServiceBus.TcpContracts
             }
         }
         
-        public static void SerializeListWithCounterAsByte<T>(this Stream stream, IReadOnlyList<T> data, Action<T> serializeItem)
+        public static void SerializeListWithCounterAsByte<TKey, TValue>(this Stream stream, IReadOnlyDictionary<TKey, TValue> data, 
+            Action<KeyValuePair<TKey, TValue>> serializeItem)
         {
+
+            if (data == null)
+            {
+                stream.WriteByte(0);
+                return;
+            }
+            
             var len = (byte)data.Count;
             stream.WriteByte(len);
 
@@ -144,14 +152,19 @@ namespace MyServiceBus.TcpContracts
             return result;
         }
         
-        public static async ValueTask<IReadOnlyList<T>> DeserializeListWithCounterAsByte<T>(this ITcpDataReader dataReader, Func<ValueTask<T>> deserializeItemAsync, CancellationToken t)
+        public static async ValueTask<IReadOnlyDictionary<TKey, TValue>> DeserializeListWithCounterAsByte<TKey, TValue>(this ITcpDataReader dataReader, 
+            Func<ValueTask<KeyValuePair<TKey, TValue>>> deserializeItemAsync, CancellationToken t)
         {
             var len = await dataReader.ReadAndCommitByteAsync(t);
 
-            var result = new T[len];
+            if (len == 0)
+                return null;
+
+            var result = new Dictionary<TKey, TValue>();
             for (var i = 0; i < len; i++)
             {
-                result[i] = await deserializeItemAsync();
+                var item = await deserializeItemAsync();
+                result.Add(item.Key, item.Value);
             }
 
             return result;

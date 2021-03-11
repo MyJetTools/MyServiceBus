@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.TcpContracts;
@@ -47,7 +48,7 @@ namespace MyServiceBus.TcpClient
             return this;
         }
 
-        private readonly Dictionary<string, SubscriberInfo> _subscribers = new Dictionary<string, SubscriberInfo>();
+        private readonly Dictionary<string, SubscriberInfo> _subscribers = new ();
 
 
         public void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
@@ -78,7 +79,8 @@ namespace MyServiceBus.TcpClient
                     throw new Exception("No active connection");
             }
 
-            var result = _payLoadCollector.AddMessage(connection.Id, topicId, valueToPublish, immediatelyPersist);
+            var result = _payLoadCollector.AddMessage(connection.Id, topicId, 
+                valueToPublish, null, immediatelyPersist);
 
             var nextPayloadToPublish = _payLoadCollector.GetNextPayloadToPublish();
             
@@ -88,7 +90,7 @@ namespace MyServiceBus.TcpClient
             return result;
         }
         
-        public Task PublishAsync(string topicId, IEnumerable<byte[]> valueToPublish, bool immediatelyPersist)
+        public Task PublishAsync(string topicId, IEnumerable<byte[]> payLoads, bool immediatelyPersist)
         {
             var connection = (MyServiceBusTcpContext)_clientTcpSocket.CurrentTcpContext;
             
@@ -98,7 +100,10 @@ namespace MyServiceBus.TcpClient
                     throw new Exception("No active connection");
             }
 
-            var result = _payLoadCollector.AddMessage(connection.Id, topicId, valueToPublish, immediatelyPersist);
+            var publishData 
+                = payLoads.Select(bytes => (bytes, (IReadOnlyDictionary<string, string>)null));
+
+            var result = _payLoadCollector.AddMessages(connection.Id, topicId, publishData, immediatelyPersist);
 
             var nextPayloadToPublish = _payLoadCollector.GetNextPayloadToPublish();
 
@@ -108,7 +113,21 @@ namespace MyServiceBus.TcpClient
             return result;
         }
 
-        private readonly PayLoadCollector _payLoadCollector = new PayLoadCollector(1024*1024*5);
+        public PublishBuilder PublishWithMetaData(string topicId, byte[] payLoad, bool immediatelyPersist)
+        {
+            var connection = (MyServiceBusTcpContext)_clientTcpSocket.CurrentTcpContext;
+            
+            if (_throwExceptionIfPublishNoConnection)
+            {
+                if (connection == null)
+                    throw new Exception("No active connection");
+            }
+            
+            return new PublishBuilder(connection.Id, _payLoadCollector, topicId, payLoad, immediatelyPersist);
+        }
+        
+
+        private readonly PayLoadCollector _payLoadCollector = new (1024*1024*5);
         
         public void Start()
         {

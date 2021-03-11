@@ -108,9 +108,9 @@ namespace MyServiceBus.TcpContracts.Tests
                     5, true, 
                     new[]
                     {
-                        (new byte[] {1, 2, 3}, PublishContract.EmptyMetaData), 
-                        (new byte[] {4, 5, 6}, PublishContract.EmptyMetaData), 
-                        (new byte[] {7, 8, 9}, PublishContract.EmptyMetaData)
+                        new byte[] {1, 2, 3}, 
+                        new byte[] {4, 5, 6}, 
+                        new byte[] {7, 8, 9}
                     });
 
             var dataReader = new TcpDataReader(2048);
@@ -152,9 +152,10 @@ namespace MyServiceBus.TcpContracts.Tests
                     5, true, 
                     new[]
                     {
-                        (new byte[] {1, 2, 3}, (IReadOnlyList<KeyValuePair<string,string>>)new[]{new KeyValuePair<string,string>("Key1","Value1")}), 
-                        (new byte[] {4, 5, 6}, new[]{new KeyValuePair<string,string>("Key2","Value2")}), 
-                        (new byte[] {7, 8, 9}, new[]{new KeyValuePair<string,string>("Key3","Value3")})
+                        (new byte[] {1, 2, 3}, (IReadOnlyDictionary<string, string>)
+                            new Dictionary<string, string> {["Key1"] = "Value1"}), 
+                        (new byte[] {4, 5, 6}, new Dictionary<string, string> {["Key2"] = "Value2"}), 
+                        (new byte[] {7, 8, 9}, new Dictionary<string, string> {["Key3"] = "Value3"})
                     });
 
             var dataReader = new TcpDataReader(2048);
@@ -177,6 +178,10 @@ namespace MyServiceBus.TcpContracts.Tests
             Assert.AreEqual(d1[0].payload.ToArray()[0], d2[0].payload.ToArray()[0]);
             Assert.AreEqual(d1[1].payload.ToArray()[0], d2[1].payload.ToArray()[0]);
             Assert.AreEqual(d1[2].payload.ToArray()[0], d2[2].payload.ToArray()[0]); 
+            
+            
+            Assert.AreEqual(d1[0].metaData.ToArray()[0].Key, d2[0].metaData.ToArray()[0].Key);
+            Assert.AreEqual(d1[0].metaData.ToArray()[0].Value, d2[0].metaData.ToArray()[0].Value);
         }
 
         [Test]

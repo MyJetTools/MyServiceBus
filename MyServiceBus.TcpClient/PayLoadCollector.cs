@@ -27,11 +27,20 @@ namespace MyServiceBus.TcpClient
 
         public readonly TaskCompletionSource<int> CommitTask = new TaskCompletionSource<int>();
 
-        private readonly List<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> _payLoads = new ();
+        private readonly List<(byte[] data, IReadOnlyDictionary<string, string>)> _payLoads = new ();
 
-        public IReadOnlyList<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> PayLoads => _payLoads;
+        public IReadOnlyList<(byte[] data, IReadOnlyDictionary<string, string>)> PayLoads => _payLoads;
 
-        public void AddRange(IEnumerable<(byte[] data, IReadOnlyList<KeyValuePair<string, string>>)> payLoads, bool immediatelyPersist)
+        public void Add(byte[] payLoad, IReadOnlyDictionary<string, string> metaData, bool immediatelyPersist)
+        {
+            if (immediatelyPersist)
+                ImmediatelyPersist = true;
+            
+            _payLoads.Add((payLoad, metaData));
+            PayLoadSize++;
+        }
+        
+        public void AddRange(IEnumerable<(byte[] data, IReadOnlyDictionary<string, string>)> payLoads, bool immediatelyPersist)
         {
             if (immediatelyPersist)
                 ImmediatelyPersist = true;
@@ -41,24 +50,6 @@ namespace MyServiceBus.TcpClient
                 _payLoads.Add(payLoad);
                 PayLoadSize++;
             }
-        }
-
-        public void Add(byte[] payLoad, bool immediatelyPersist)
-        {
-            if (immediatelyPersist)
-                ImmediatelyPersist = true;
-            
-            _payLoads.Add((payLoad, Array.Empty<KeyValuePair<string, string>>()));
-            PayLoadSize++;
-        }
-        
-        public void Add(byte[] payLoad, bool immediatelyPersist, IReadOnlyList<KeyValuePair<string, string>> metaData)
-        {
-            if (immediatelyPersist)
-                ImmediatelyPersist = true;
-            
-            _payLoads.Add((payLoad, metaData));
-            PayLoadSize++;
         }
 
         public long PayLoadSize { get; private set; } 
@@ -71,7 +62,7 @@ namespace MyServiceBus.TcpClient
 
         private long _nextRequestId;
 
-        private readonly SortedDictionary<string, List<PayloadPackage>> _readyToGo = new SortedDictionary<string, List<PayloadPackage>>();
+        private readonly SortedDictionary<string, List<PayloadPackage>> _readyToGo = new ();
 
         public PayLoadCollector(int maxPayLoadSize)
         {
@@ -127,29 +118,29 @@ namespace MyServiceBus.TcpClient
                 throw new Exception("Disconnected");
 
         }
-
-        private static IReadOnlyList<KeyValuePair<string, string>> _emptyPayload = Array.Empty<KeyValuePair<string, string>>();
         
-        public Task AddMessage(long connectionId, string topicId, IEnumerable<byte[]> newPayLoad, bool immediatelyPersist)
+        public Task AddMessage(long connectionId, string topicId, byte[] newPayLoad, 
+            IReadOnlyDictionary<string, string> metaData, bool immediatelyPersist)
         {
             lock (_readyToGo)
             {
                 CheckIfItStillConnected(connectionId);
                 var payLoadPackage = GetNextPayloadPackage(topicId, connectionId);
-
-                var payLoad = newPayLoad.Select(itm => (itm, _emptyPayload));
-                payLoadPackage.AddRange(payLoad, immediatelyPersist);
+                payLoadPackage.Add(newPayLoad, metaData, immediatelyPersist);
                 return payLoadPackage.CommitTask.Task;
             }
         }
- 
-        public Task AddMessage(long connectionId, string topicId, byte[] newPayLoad, bool immediatelyPersist)
+        
+        public Task AddMessages(long connectionId, string topicId, 
+            IEnumerable<(byte[] data, IReadOnlyDictionary<string, string> metaData)> newPayLoad, 
+            bool immediatelyPersist)
         {
             lock (_readyToGo)
             {
                 CheckIfItStillConnected(connectionId);
                 var payLoadPackage = GetNextPayloadPackage(topicId, connectionId);
-                payLoadPackage.Add(newPayLoad, immediatelyPersist);
+
+                payLoadPackage.AddRange(newPayLoad, immediatelyPersist);
                 return payLoadPackage.CommitTask.Task;
             }
         }
@@ -162,8 +153,8 @@ namespace MyServiceBus.TcpClient
                 if (_readyToGo.Count == 0)
                     return null;
 
-
-                foreach (var topicData in _readyToGo.Where(topicData => topicData.Value.Count > 0))
+                foreach (var topicData in _readyToGo
+                    .Where(topicData => topicData.Value.Count > 0))
                 {
                     var resultPackage = topicData.Value.First();
                     if (resultPackage.OnPublishing)

@@ -77,7 +77,7 @@ namespace MyServiceBus.Domains.Topics
             return _topicQueueList.CreateQueueIfNotExists(this, queueName, topicQueueType, MessageId.Value, overrideTopicQueueType);
         }
 
-        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<(byte[], IReadOnlyList<KeyValuePair<string, string>>)> messages, DateTime now)
+        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<(byte[] payLoad, IReadOnlyDictionary<string, string> metaData)> messages, DateTime now)
         {
             _requestsPerSecond++;
 
@@ -91,8 +91,10 @@ namespace MyServiceBus.Domains.Topics
                     {
                         MessageId = generator.GetNextMessageId(),
                         Created = now,
-                        Data = message.Item1,
-                        MetaData = message.Item2.Select(itm => new MessageContentMetaDataItem
+                        Data = message.payLoad,
+                        MetaData = message.metaData == null 
+                            ? Array.Empty<MessageContentMetaDataItem>() 
+                            : message.metaData.Select(itm => new MessageContentMetaDataItem
                         {
                             Key = itm.Key,
                             Value = itm.Value
