@@ -31,7 +31,6 @@ namespace MyServiceBus.TcpContracts.Tests
 
             var serializer = new MyServiceBusTcpSerializer();
 
-
             var pingContract = new PingContract();
 
             var rawData = serializer.Serialize(pingContract);

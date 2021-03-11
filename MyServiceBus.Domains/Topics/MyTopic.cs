@@ -92,9 +92,7 @@ namespace MyServiceBus.Domains.Topics
                         MessageId = generator.GetNextMessageId(),
                         Created = now,
                         Data = message.payLoad,
-                        MetaData = message.metaData == null 
-                            ? Array.Empty<MessageContentMetaDataItem>() 
-                            : message.metaData.Select(itm => new MessageContentMetaDataItem
+                        MetaData = message.metaData?.Select(itm => new MessageContentMetaDataItem
                         {
                             Key = itm.Key,
                             Value = itm.Value
