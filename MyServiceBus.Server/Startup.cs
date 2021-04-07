@@ -25,8 +25,6 @@ namespace MyServiceBus.Server
 
         public IConfiguration Configuration { get; }
 
-        public static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(1);
-
         private IServiceCollection _services;
 
         public void ConfigureServices(IServiceCollection services)

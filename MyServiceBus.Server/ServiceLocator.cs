@@ -75,6 +75,8 @@ namespace MyServiceBus.Server
         public static MessagesPerSecondByTopic MessagesPerSecondByTopic { get; private set; }
         public static GrpcSessionsList GrpcSessionsList { get; private set; }
 
+        private static IMetricCollector _metricCollector;
+
         public static void Init(IServiceProvider serviceProvider)
         {
 
@@ -94,6 +96,8 @@ namespace MyServiceBus.Server
             
             MyServiceBusBackgroundExecutor = serviceProvider.GetRequiredService<MyServiceBusBackgroundExecutor>();
 
+            _metricCollector = serviceProvider.GetRequiredService<IMetricCollector>();
+
             DataInitializer.InitAsync(serviceProvider).Wait();
         }
         
@@ -103,9 +107,6 @@ namespace MyServiceBus.Server
         private static readonly MyTaskTimer TimerPersistent = new (1000);
 
         private static readonly MyTaskTimer TimerStatistic = new (1000);
-        
-        
-        
 
 
         public static void Start()
@@ -140,11 +141,33 @@ namespace MyServiceBus.Server
                 {
                     connection.SessionContext.OneSecondTimer();
                 }
-                
+
                 foreach (var myTopic in TopicsList.Get())
+                {
                     MessagesPerSecondByTopic.PutData(myTopic.TopicId, myTopic.MessagesPerSecond);
+                    _metricCollector.UpdateTopicQueueSize(myTopic);
+
+                    foreach (var queue in myTopic.GetQueues())
+                    {
+                        _metricCollector.UpdateTopicQueueSize(queue);
+                    }
+                }
+                    
 
                 return new ValueTask(MonitoringHub.BroadCasMetricsAsync());
+            });
+            
+            
+            TimerStatistic.Register("Prometheus", () =>
+            {
+
+                foreach (var topic in TopicsList.Get())
+                {
+
+                }
+                
+                
+                return new ValueTask();
             });
 
             TimerGarbageCollector.Start();

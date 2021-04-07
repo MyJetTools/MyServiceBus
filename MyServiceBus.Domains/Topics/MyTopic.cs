@@ -99,8 +99,6 @@ namespace MyServiceBus.Domains.Topics
                     _messagePerSecond++;
                 }
             });
-            
-            _metricCollector.TopicQueueSize(TopicId, _topicQueueList.GetMessagesCount());
 
             MessagesContentCache.AddMessages(newMessages);
             return newMessages;
@@ -129,7 +127,6 @@ namespace MyServiceBus.Domains.Topics
                 queue.ConfirmNotDelivery(subscriber, duration);  
  
             _topicQueueList.CalcMinMessageId();
-            _metricCollector.TopicQueueSize(TopicId, _topicQueueList.GetMessagesCount());
 
             return queue;
         }
@@ -152,7 +149,6 @@ namespace MyServiceBus.Domains.Topics
             queue.ConfirmMessagesByNotDelivery(subscriber, duration, queueWithIntervals);
             
             _topicQueueList.CalcMinMessageId();
-            _metricCollector.TopicQueueSize(TopicId, _topicQueueList.GetMessagesCount());
 
             return queue;
         }

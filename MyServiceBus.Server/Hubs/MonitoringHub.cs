@@ -60,9 +60,5 @@ namespace MyServiceBus.Server.Hubs
             return base.OnDisconnectedAsync(exception);
         }
 
-        
-
-
-
     }
 }

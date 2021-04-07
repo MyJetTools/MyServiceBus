@@ -1,9 +1,12 @@
+using MyServiceBus.Domains.Queues;
+using MyServiceBus.Domains.Topics;
+
 namespace MyServiceBus.Domains
 {
     public interface IMetricCollector
     {
-        void TopicQueueSize(string topicId, long queueSize);
-
-        void ToPersistSize(string topicId, long queueSize);
+        void UpdateTopicQueueSize(MyTopic topic);
+        void UpdateTopicQueueSize(TopicQueue topicQueue);
+        void UpdateToPersistSize(string topicId, long queueSize);
     }
 }

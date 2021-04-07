@@ -15,8 +15,6 @@ namespace MyServiceBus.Domains.Persistence
         IReadOnlyList<(string topic, int count)> GetMessagesToPersistCount();
         
         int Count { get; }
-        
-        
 
     } 
     
@@ -65,7 +63,7 @@ namespace MyServiceBus.Domains.Persistence
 
         private void PutMessagesToPersistMetric(string topicId)
         {
-            _metricCollector.ToPersistSize(topicId,_messagesToPersist[topicId].Count);
+            _metricCollector.UpdateToPersistSize(topicId,_messagesToPersist[topicId].Count);
         }
 
         public IReadOnlyList<MessageContentGrpcModel> GetMessagesToPersist(string topicId)
