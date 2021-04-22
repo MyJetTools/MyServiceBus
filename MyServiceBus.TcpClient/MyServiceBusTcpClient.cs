@@ -14,7 +14,7 @@ namespace MyServiceBus.TcpClient
 
         private readonly MyClientTcpSocket<IServiceBusTcpContract> _clientTcpSocket;
 
-        private readonly List<(string topicName, int maxCachedSize)> _checkAndCreateTopics = new List<(string topicName, int maxCachedSize)>();
+        private readonly List<(string topicName, int maxCachedSize)> _checkAndCreateTopics = new ();
 
         public MyServiceBusLog<MyServiceBusTcpClient> Log { get;}
         
@@ -28,7 +28,7 @@ namespace MyServiceBus.TcpClient
                 )
                 .RegisterTcpSerializerFactory(()=>new MyServiceBusTcpSerializer())
                 .RegisterTcpContextFactory(() => new MyServiceBusTcpContext(_subscribers, name, 
-                    _payLoadCollector, ()=>_checkAndCreateTopics));
+                     ()=>_checkAndCreateTopics));
         }
 
 
@@ -47,7 +47,7 @@ namespace MyServiceBus.TcpClient
             return this;
         }
 
-        private readonly Dictionary<string, SubscriberInfo> _subscribers = new Dictionary<string, SubscriberInfo>();
+        private readonly Dictionary<string, SubscriberInfo> _subscribers = new ();
 
 
         public void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
@@ -79,17 +79,17 @@ namespace MyServiceBus.TcpClient
                     throw new Exception("No active connection");
             }
 
-            var result = _payLoadCollector.AddMessage(connection.Id, topicId, valueToPublish, immediatelyPersist);
+            var result = connection.PayLoadCollector.PostMessage(topicId, valueToPublish, immediatelyPersist);
 
-            var nextPayloadToPublish = _payLoadCollector.GetNextPayloadToPublish();
+            var (nextPayloadToPublish, nextTopicId) = connection.PayLoadCollector.GetNextPayloadToPublish();
             
             if (nextPayloadToPublish != null)
-                connection.Publish(nextPayloadToPublish);
+                connection.Publish(nextPayloadToPublish, nextTopicId);
             
             return result;
         }
         
-        public Task PublishAsync(string topicId, IEnumerable<byte[]> valueToPublish, bool immediatelyPersist)
+        public Task PublishAsync(string topicId, IEnumerable<byte[]> valuesToPublish, bool immediatelyPersist)
         {
             var connection = (MyServiceBusTcpContext)_clientTcpSocket.CurrentTcpContext;
             
@@ -99,18 +99,16 @@ namespace MyServiceBus.TcpClient
                     throw new Exception("No active connection");
             }
 
-            var result = _payLoadCollector.AddMessage(connection.Id, topicId, valueToPublish, immediatelyPersist);
+            var result = connection.PayLoadCollector.PostMessages(topicId, valuesToPublish, immediatelyPersist);
 
-            var nextPayloadToPublish = _payLoadCollector.GetNextPayloadToPublish();
+            var (nextPayloadToPublish, nextTopicId) = connection.PayLoadCollector.GetNextPayloadToPublish();
 
             if (nextPayloadToPublish != null)
-                connection.Publish(nextPayloadToPublish);
+                connection.Publish(nextPayloadToPublish, nextTopicId);
 
             return result;
         }
 
-        private readonly PayLoadCollector _payLoadCollector = new PayLoadCollector(1024*1024*5);
-        
         public void Start()
         {
             _clientTcpSocket.Start();

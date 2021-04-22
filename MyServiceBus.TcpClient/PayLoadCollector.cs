@@ -1,218 +1,149 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace MyServiceBus.TcpClient
 {
-
-    public class PayloadPackage
-    {
-        public long RequestId { get; }
-        
-        public string TopicId { get; }
-        
-        public bool ImmediatelyPersist { get; private set; }
-        
-        public bool OnPublishing { get; set; }
-        
-        public long ConnectionId { get; }
-
-        public PayloadPackage(string topicId, long requestId, long connectionId)
-        {
-            ConnectionId = connectionId;
-            TopicId = topicId;
-            RequestId = requestId;
-        }
-
-        public readonly TaskCompletionSource<int> CommitTask = new TaskCompletionSource<int>();
-
-        private readonly List<byte[]> _payLoads = new List<byte[]>();
-
-        public IReadOnlyList<byte[]> PayLoads => _payLoads;
-
-        public void Add(IEnumerable<byte[]> payLoads, bool immediatelyPersist)
-        {
-            if (immediatelyPersist)
-                ImmediatelyPersist = true;
-
-            foreach (var payLoad in payLoads)
-            {
-                _payLoads.Add(payLoad);
-                PayLoadSize++;
-            }
-        }
-
-        public void Add(byte[] payLoad, bool immediatelyPersist)
-        {
-            if (immediatelyPersist)
-                ImmediatelyPersist = true;
-            
-            _payLoads.Add(payLoad);
-            PayLoadSize++;
-        }
-
-        public long PayLoadSize { get; private set; } 
-    }
-
-    
     public class PayLoadCollector
     {
         private readonly int _maxPayLoadSize;
 
-        private long _nextRequestId;
+        private readonly SortedDictionary<string, PayloadPackagesList> _packagesByTopic = new ();
 
-        private readonly SortedDictionary<string, List<PayloadPackage>> _readyToGo = new SortedDictionary<string, List<PayloadPackage>>();
+        private bool _disconnected;
 
         public PayLoadCollector(int maxPayLoadSize)
         {
             _maxPayLoadSize = maxPayLoadSize;
         }
 
-        private PayloadPackage AddPayloadPackage(string topicId, long connectionId)
-        {
-            _nextRequestId++;
-            var result = new PayloadPackage(topicId, _nextRequestId, connectionId);
 
-            if (_readyToGo.TryGetValue(topicId, out var list))
-            {
-                list.Add(result);
-            }
-            else
-                _readyToGo[topicId].Add(result);
-            
-            return result;
+        private static long _nextId;
+
+        private static long GetNextId()
+        {
+            _nextId++;
+            return _nextId;
         }
 
-        private List<PayloadPackage> GetPayloadPackagesByTopic(string topicId)
+        private PayloadPackagesList GetOrCreatePayloadPackagesByTopic(string topicId)
         {
-            if (_readyToGo.TryGetValue(topicId, out var foundResult))
+            if (_packagesByTopic.TryGetValue(topicId, out var foundResult))
                 return foundResult;
 
-            var result = new List<PayloadPackage>();
-            _readyToGo.Add(topicId, result);
+            var result = new PayloadPackagesList(_maxPayLoadSize, GetNextId);
+            _packagesByTopic.Add(topicId, result);
             return result;
         }
 
-        private PayloadPackage GetNextPayloadPackage(string topicId, long connectionId)
+        private PayloadPackage GetNextPayloadPackageToPost(string topicId)
         {
-            var payloadsByTopic = GetPayloadPackagesByTopic(topicId);
+            var payloadsByTopic = GetOrCreatePayloadPackagesByTopic(topicId);
 
-            if (payloadsByTopic.Count == 0)
-                return AddPayloadPackage(topicId, connectionId);
-
-            var lastPayload = payloadsByTopic[^1];
-
-            if (lastPayload.PayLoadSize >= _maxPayLoadSize || lastPayload.OnPublishing)
-                return AddPayloadPackage(topicId, connectionId);
-
-            return lastPayload;
+            return payloadsByTopic.GetNextPayloadPackageToPost();
         }
-        
-        private void CheckIfItStillConnected(long connectionId)
-        {
-            if (_lastDisconnectId == -1)
-                return;
 
-            if (_lastDisconnectId == connectionId)
+        private void CheckIfItStillConnected()
+        {
+            if (_disconnected)
                 throw new Exception("Disconnected");
-
         }
-        
-        public Task AddMessage(long connectionId, string topicId, IEnumerable<byte[]> newPayLoad, bool immediatelyPersist)
+
+        public Task PostMessages(string topicId, IEnumerable<byte[]> newPayLoad, bool immediatelyPersist)
         {
-            lock (_readyToGo)
+            lock (_packagesByTopic)
             {
-                CheckIfItStillConnected(connectionId);
-                var payLoadPackage = GetNextPayloadPackage(topicId, connectionId);
+                CheckIfItStillConnected();
+                var payLoadPackage = GetNextPayloadPackageToPost(topicId);
                 payLoadPackage.Add(newPayLoad, immediatelyPersist);
-                return payLoadPackage.CommitTask.Task;
+                return payLoadPackage.GetTask();
             }
         }
  
-        public Task AddMessage(long connectionId, string topicId, byte[] newPayLoad, bool immediatelyPersist)
+        public Task PostMessage(string topicId, byte[] newPayLoad, bool immediatelyPersist)
         {
-            lock (_readyToGo)
+            lock (_packagesByTopic)
             {
-                CheckIfItStillConnected(connectionId);
-                var payLoadPackage = GetNextPayloadPackage(topicId, connectionId);
+                CheckIfItStillConnected();
+                var payLoadPackage = GetNextPayloadPackageToPost(topicId);
                 payLoadPackage.Add(newPayLoad, immediatelyPersist);
-                return payLoadPackage.CommitTask.Task;
+                return payLoadPackage.GetTask();
             }
         }
-        
-        public PayloadPackage GetNextPayloadToPublish()
+
+        public (PayloadPackage nextPackage, string topicId) GetNextPayloadToPublish()
         {
-            lock (_readyToGo)
+            lock (_packagesByTopic)
             {
 
-                if (_readyToGo.Count == 0)
-                    return null;
+                if (_packagesByTopic.Count == 0)
+                    return (null, null);
 
-
-                foreach (var topicData in _readyToGo.Where(topicData => topicData.Value.Count > 0))
+                foreach (var (topicId, packagesList) in _packagesByTopic)
                 {
-                    var resultPackage = topicData.Value.First();
-                    if (resultPackage.OnPublishing)
-                        continue;
-                    
-                    resultPackage.OnPublishing = true;
-                    return resultPackage;
+                    var nextPackageToDeliver = packagesList.GetNextPayloadPackageToDeliver();
+
+                    if (nextPackageToDeliver != null)
+                        return (nextPackageToDeliver, topicId);
                 }
 
-                return null;
+                return (null, null);
             }
         }
 
         public void SetPublished(long requestId)
         {
-            TaskCompletionSource<int> singleTask = null;
-            List<TaskCompletionSource<int>> taskToComplete = null;
+            PayloadPackage singleTask = null;
+            List<PayloadPackage> taskToComplete = null;
 
-            lock (_readyToGo)
+            lock (_packagesByTopic)
             {
-                foreach (var topicData in _readyToGo.Where(topicData => topicData.Value.Count > 0))
+                foreach (var (topicId, packagesList) in _packagesByTopic)
                 {
-                    var packageToCommit = topicData.Value.First();
+                    var committedPackage = packagesList.TryToCommit(requestId);
 
-                    if (packageToCommit.RequestId != requestId)
+                    if (committedPackage == null)
                         continue;
 
-                    topicData.Value.RemoveAt(0);
-
                     if (singleTask == null)
-                        singleTask = packageToCommit.CommitTask;
+                        singleTask = committedPackage;
                     else
                     {
                         taskToComplete ??= new();
-                        taskToComplete.Add(packageToCommit.CommitTask);
+                        taskToComplete.Add(committedPackage);
+                    }
+                }
+
+            }
+
+            singleTask?.CommitTask();
+            taskToComplete?.ForEach(task => task.CommitTask());
+        }
+
+        public void Disconnect()
+        {
+            List<PayloadPackage> result = null;
+            lock (_packagesByTopic)
+            {
+                _disconnected = true;
+                foreach (var value in _packagesByTopic.Values)
+                {
+                    var allPackages = value.ClearAll();
+                    
+                    if (allPackages.Count>0)
+                    {
+                        result ??= new List<PayloadPackage>();
+                        result.AddRange(allPackages);
                     }
                 }
             }
+            
+            if (result == null)
+                return;
 
-            singleTask?.SetResult(0);
-            taskToComplete?.ForEach(task => task.SetResult(0));
-        }
-
-        private long _lastDisconnectId = -1;
-
-        public void Disconnect(long connectionId)
-        {
-            lock (_readyToGo)
+            foreach (var payloadPackage in result)
             {
-                _lastDisconnectId = connectionId;
-                foreach (var value in _readyToGo.Values)
-                {
-                    while (value.Count > 0)
-                    {
-                        var first = value.First();
-                        if (first.ConnectionId != connectionId)
-                            break;
-                        
-                        first.CommitTask.SetException(new Exception("Disconnected"));
-                        value.RemoveAt(0);
-                    }
-                }
+                payloadPackage.Disconnect();
             }
         }
     }

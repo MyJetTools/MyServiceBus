@@ -16,13 +16,11 @@ namespace MyServiceBus.TcpClient
         private readonly Func<IReadOnlyList<(string topicName, int maxCachedSize)>> _checkAndCreateTopicOnConnect;
 
 
-        private readonly PayLoadCollector _payLoadCollector;
+        public readonly PayLoadCollector PayLoadCollector = new (1024 * 1024 * 4);
 
-        public MyServiceBusTcpContext(Dictionary<string, SubscriberInfo> subscribers, string name, 
-            PayLoadCollector payLoadCollector,
+        public MyServiceBusTcpContext(Dictionary<string, SubscriberInfo> subscribers, string name,
             Func<IReadOnlyList<(string topicName, int maxCachedSize)>> checkAndCreateTopicOnConnect)
         {
-            _payLoadCollector = payLoadCollector;
             _subscribers = subscribers;
             _name = name;
             _checkAndCreateTopicOnConnect = checkAndCreateTopicOnConnect;
@@ -51,19 +49,19 @@ namespace MyServiceBus.TcpClient
         
         protected override ValueTask OnDisconnectAsync()
         {
-            _payLoadCollector.Disconnect(Id);
+            PayLoadCollector.Disconnect();
             return new ValueTask();
         }
 
 
         private void HandlePublishResponse(PublishResponseContract pr)
         {
-            _payLoadCollector.SetPublished(pr.RequestId);
+            PayLoadCollector.SetPublished(pr.RequestId);
 
-            var nextPackageToPublish = _payLoadCollector.GetNextPayloadToPublish();
+            var (nextPackageToPublish, topicId) = PayLoadCollector.GetNextPayloadToPublish();
 
             if (nextPackageToPublish != null)
-                Publish(nextPackageToPublish);
+                Publish(nextPackageToPublish, topicId);
         }
 
         protected override ValueTask HandleIncomingDataAsync(IServiceBusTcpContract data)
@@ -164,11 +162,9 @@ namespace MyServiceBus.TcpClient
             SendDataToSocket(contract);
         }
         
-        
         private const int ProtocolVersion = 2; 
         
-        
-        private static readonly Lazy<string> GetClientVersion = new Lazy<string>(() =>
+        private static readonly Lazy<string> GetClientVersion = new (() =>
         {
             try
             {
@@ -179,8 +175,6 @@ namespace MyServiceBus.TcpClient
                 return null;
             }
         });
-        
-        
         
         private void SendGreetings(string name)
         {
@@ -201,7 +195,6 @@ namespace MyServiceBus.TcpClient
             SendDataToSocket(contract);
         }
 
-
         private void SendPacketVersions()
         {
             var packetVersions = new PacketVersionsContract();
@@ -220,19 +213,17 @@ namespace MyServiceBus.TcpClient
             SendDataToSocket(contract);
         }
 
-
         protected override IServiceBusTcpContract GetPingPacket()
         {
             return PingContract.Instance;
         }
 
-
-        public void Publish(PayloadPackage payloadPackage)
+        public void Publish(PayloadPackage payloadPackage, string topicId)
         {
 
             var contract = new PublishContract
             {
-                TopicId = payloadPackage.TopicId,
+                TopicId = topicId,
                 RequestId = payloadPackage.RequestId,
                 Data = payloadPackage.PayLoads,
                 ImmediatePersist = payloadPackage.ImmediatelyPersist ? (byte) 1 : (byte) 0
