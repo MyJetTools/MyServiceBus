@@ -8,10 +8,10 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.1" />
-        <PackageReference Include="MyServiceBus.Persistence.Grpc" Version="1.0.5" />
-        <PackageReference Include="nunit" Version="3.13.1" />
+        <PackageReference Include="MyServiceBus.Persistence.Grpc" Version="1.0.8" />
+        <PackageReference Include="nunit" Version="3.13.2" />
         <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
     </ItemGroup>
 
     <ItemGroup>

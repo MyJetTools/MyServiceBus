@@ -9,18 +9,18 @@
     <ItemGroup>
         <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.0.1" />
         <PackageReference Include="BuildBundlerMinifier" Version="3.2.449" />
-        <PackageReference Include="DotNetCoreDecorators" Version="1.0.20" />
+        <PackageReference Include="DotNetCoreDecorators" Version="1.0.21" />
         <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.17.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="5.0.3" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="5.0.6" />
         <PackageReference Include="MyServiceBus.Grpc" Version="1.0.12" />
-        <PackageReference Include="MySettingsReader" Version="1.1.1" />
-        <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-        <PackageReference Include="NSwag.AspNetCore" Version="13.10.7" />
-        <PackageReference Include="NSwag.Core" Version="13.10.7" />
+        <PackageReference Include="MySettingsReader" Version="1.2.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+        <PackageReference Include="NSwag.AspNetCore" Version="13.11.1" />
+        <PackageReference Include="NSwag.Core" Version="13.11.1" />
         <PackageReference Include="prometheus-net.AspNetCore" Version="4.1.1" />
-        <PackageReference Include="protobuf-net.Grpc" Version="1.0.147" />
-        <PackageReference Include="protobuf-net.Grpc.AspNetCore" Version="1.0.147" />
-        <PackageReference Include="Grpc.Net.Client" Version="2.35.0" />        
+        <PackageReference Include="protobuf-net.Grpc" Version="1.0.152" />
+        <PackageReference Include="protobuf-net.Grpc.AspNetCore" Version="1.0.152" />
+        <PackageReference Include="Grpc.Net.Client" Version="2.37.0" />        
     </ItemGroup>
 
     <ItemGroup>
