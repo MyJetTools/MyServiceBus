@@ -11,8 +11,6 @@ namespace MyServiceBus.Domains.Tests.GrpcMocks
         private readonly Dictionary<string, Dictionary<long, MessageContentGrpcModel>> _messages
             = new Dictionary<string, Dictionary<long, MessageContentGrpcModel>>();
 
-
-
         private IReadOnlyList<MessageContentGrpcModel> GetPageAsync(string topicId, long pageId)
         {
             var result = new List<MessageContentGrpcModel>();
@@ -30,15 +28,8 @@ namespace MyServiceBus.Domains.Tests.GrpcMocks
 
             return result;
         }
-        
-        
-        public IAsyncEnumerable<byte[]> GetPageCompressedAsync(GetMessagesPageGrpcRequest request)
-        {
-            var page = GetPageAsync(request.TopicId, request.PageNo);
-            return page.CompressAndSplitAsync(1024 * 1024 * 3);
-        }
 
-        public async ValueTask SaveMessagesAsync(IAsyncEnumerable<byte[]> request)
+        public async ValueTask SaveMessagesAsync(IAsyncEnumerable<CompressedMessageChunkModel> request)
         {
             var saveMessagesContract = await request.DecompressAndMerge<SaveMessagesGrpcContract>();
 
@@ -57,7 +48,13 @@ namespace MyServiceBus.Domains.Tests.GrpcMocks
                         messagesByTopic.Add(grpcMessage.MessageId, grpcMessage);
                 }
             }
-            
+        }
+
+
+        IAsyncEnumerable<CompressedMessageChunkModel> IMyServiceBusMessagesPersistenceGrpcService.GetPageCompressedAsync(GetMessagesPageGrpcRequest request)
+        {
+            var page = GetPageAsync(request.TopicId, request.PageNo);
+            return page.CompressAndSplitAsync(1024 * 1024 * 3);
         }
 
         public ValueTask<MessageContentGrpcModel> GetMessageAsync(GetMessageGrpcRequest request)
