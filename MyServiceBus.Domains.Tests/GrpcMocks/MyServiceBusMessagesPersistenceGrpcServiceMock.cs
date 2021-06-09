@@ -32,13 +32,9 @@ namespace MyServiceBus.Domains.Tests.GrpcMocks
         }
         
         
-        public IAsyncEnumerable<byte[]> GetPageCompressedAsync(GetMessagesPageGrpcRequest request)
-        {
-            var page = GetPageAsync(request.TopicId, request.PageNo);
-            return page.CompressAndSplitAsync(1024 * 1024 * 3);
-        }
 
-        public async ValueTask SaveMessagesAsync(IAsyncEnumerable<byte[]> request)
+
+        public async ValueTask SaveMessagesAsync(IAsyncEnumerable<CompressedMessageChunkModel> request)
         {
             var saveMessagesContract = await request.DecompressAndMerge<SaveMessagesGrpcContract>();
 
@@ -57,7 +53,12 @@ namespace MyServiceBus.Domains.Tests.GrpcMocks
                         messagesByTopic.Add(grpcMessage.MessageId, grpcMessage);
                 }
             }
-            
+        }
+
+        public IAsyncEnumerable<CompressedMessageChunkModel> GetPageCompressedAsync(GetMessagesPageGrpcRequest request)
+        {
+            var page = GetPageAsync(request.TopicId, request.PageNo);
+            return page.CompressAndSplitAsync(1024 * 1024 * 3);
         }
 
         public ValueTask<MessageContentGrpcModel> GetMessageAsync(GetMessageGrpcRequest request)
