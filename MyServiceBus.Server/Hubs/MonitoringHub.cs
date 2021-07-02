@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
+using MyServiceBus.Domains.Queues;
 
 namespace MyServiceBus.Server.Hubs
 {
@@ -27,15 +29,46 @@ namespace MyServiceBus.Server.Hubs
                 }
             }
             
-        } 
+        }
 
+
+        private static async Task SyncTopicsAsync(MonitoringConnection connection)
+        {
+            var (topics, topicsSnapshotId) = ServiceLocator.TopicsList.GetWithSnapshotId();
+            
+            if (connection.TopicSnapshotHasChanged(topicsSnapshotId, topics))
+                await connection.SendTopicsAsync(topics);
+        }
+
+        private static async Task SyncQueuesAsync(MonitoringConnection connection)
+        {
+            var topicContexts = connection.GetTopicContexts();
+
+            Dictionary<string, IReadOnlyList<TopicQueue>> queuesToSync = null;
+            foreach (var topicContext in topicContexts)
+            {
+                var queues = topicContext.GetQueuesIfNotSynchronized();
+                if (queues == null)
+                    continue;
+
+                queuesToSync ??= new Dictionary<string, IReadOnlyList<TopicQueue>>();
+                
+                queuesToSync.Add(topicContext.Topic.TopicId, queues);
+            }
+
+            if (queuesToSync != null)
+            {
+                await connection.SendQueuesAsync(queuesToSync);
+            }
+        }
+        
+        
         private static async Task SyncConnection(MonitoringConnection connection)
         {
-            await connection.ClientProxy.SendInitAsync();
 
-            await connection.SendTopicsAsync();
-            
-            await connection.SendQueuesAsync();
+            await SyncTopicsAsync(connection);
+
+            await SyncQueuesAsync(connection);
             
             await connection.SendTopicMetricsAsync();
             await connection.SendTopicGraphAsync();
@@ -49,6 +82,7 @@ namespace MyServiceBus.Server.Hubs
             var newConnection = new MonitoringConnection(Context.ConnectionId, Clients.Caller);
             Connections.Add(newConnection);
             Console.WriteLine("Monitoring Connection: "+Context.ConnectionId);
+            await newConnection.ClientProxy.SendInitAsync();
             await SyncConnection(newConnection);
             await base.OnConnectedAsync();
         }

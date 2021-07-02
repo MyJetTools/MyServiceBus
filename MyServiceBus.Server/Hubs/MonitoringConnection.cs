@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.SignalR;
+using MyServiceBus.Domains.Topics;
 
 namespace MyServiceBus.Server.Hubs
 {
@@ -10,13 +13,41 @@ namespace MyServiceBus.Server.Hubs
         public IClientProxy ClientProxy { get; }
         
         public string Id { get; }
-        
-        public int TopicsSnapshotId { get; set; }
-        public readonly Dictionary<string, MonitoringConnectionTopicContext> TopicContexts = new();
+
+
+        private int _topicsSnapshotId;
+
+        private IReadOnlyList<MonitoringConnectionTopicContext> _topicContexts =
+            Array.Empty<MonitoringConnectionTopicContext>();
+
+        public bool TopicSnapshotHasChanged(int topicsSnapshotId, IReadOnlyList<MyTopic> topics)
+        {
+            lock (this)
+            {
+                var result = topicsSnapshotId != _topicsSnapshotId;
+
+                if (result)
+                {
+                    _topicsSnapshotId = topicsSnapshotId;
+                    _topicContexts = topics.Select(MonitoringConnectionTopicContext.Create).ToList();
+
+                }
+
+                return result;
+            }
+        }
+
+        public IReadOnlyList<MonitoringConnectionTopicContext> GetTopicContexts()
+        {
+            return _topicContexts;
+        }
+
 
         public readonly object LockObject = new ();
 
         private readonly Dictionary<string, bool> _sentLastTimeAsEmpty = new ();
+        
+    
         internal bool DidWeSendLastTimeAsEmptyTopicGraph(string topic)
         {
             lock (LockObject)
