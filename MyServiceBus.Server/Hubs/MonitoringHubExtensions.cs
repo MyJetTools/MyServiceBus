@@ -174,7 +174,8 @@ namespace MyServiceBus.Server.Hubs
             try
             {
                 var contexts = connection.GetTopicContexts();
-                var contract = contexts.Select(ctx =>TopicMetricsHubModel.Create(ctx.Topic));
+                var contract = contexts
+                    .Select(ctx =>TopicMetricsHubModel.Create(ctx.Topic));
                 await connection.ClientProxy.SendAsync("topic-metrics", contract);
             }
             catch (Exception e)

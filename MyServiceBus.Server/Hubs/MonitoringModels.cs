@@ -76,15 +76,29 @@ namespace MyServiceBus.Server.Hubs
 
         public static TopicQueueHubModel Create(TopicQueue topicQueue)
         {
-            return new ()
+            try
             {
-                Id = topicQueue.QueueId,
-                Connections = topicQueue.SubscribersList.GetCount(),
-                QueueType = (int)topicQueue.TopicQueueType,
-                Size = topicQueue.GetMessagesCount(),
-                Ready = topicQueue.GetReadyQueueSnapshot().Select(QueueSliceHubModel.Create),
-                Leased = topicQueue.GetLeasedMessagesCount()
-            };
+                var connections = topicQueue.SubscribersList.GetCount();
+                var queueType = (int)topicQueue.TopicQueueType;
+                var messagesCount = topicQueue.GetMessagesCount();
+                var ready = topicQueue.GetReadyQueueSnapshot().Select(QueueSliceHubModel.Create);
+                var leased = topicQueue.GetLeasedMessagesCount();
+                return new ()
+                {
+                    Id = topicQueue.QueueId,
+                    Connections = connections,
+                    QueueType = queueType,
+                    Size = messagesCount,
+                    Ready = ready,
+                    Leased = leased
+                };
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+
         }
     }
     
@@ -152,14 +166,17 @@ namespace MyServiceBus.Server.Hubs
 
         public static TopicMetricsHubModel Create(MyTopic topic)
         {
-            return new ()
+
+            return new()
             {
                 Id = topic.TopicId,
-                Pages = topic.MessagesContentCache.GetPages().Select(itm => TopicPageModel.Create(itm.no+":"+itm.size.ByteSizeToString(), itm.percent)),
+                Pages = topic.MessagesContentCache.GetPages().Select(itm =>
+                    TopicPageModel.Create(itm.no + ":" + itm.size.ByteSizeToString(), itm.percent)),
                 MsgPerSec = topic.MessagesPerSecond,
                 ReqPerSec = topic.RequestsPerSecond,
-                Queues = topic.GetQueues().Select(TopicQueueHubModel.Create)
+                Queues = topic.GetQueues().Select(TopicQueueHubModel.Create).Where(itm => itm != null)
             };
+
         }
     
     }
