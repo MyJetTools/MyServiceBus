@@ -14,8 +14,6 @@ namespace MyServiceBus.Server.Hubs
         public string Version { get; set; }
     }
 
-
-
     public class TopicPageModel
     {
         public string Label { get; set; }
@@ -96,7 +94,7 @@ namespace MyServiceBus.Server.Hubs
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                throw;
+                return null;
             }
 
         }
