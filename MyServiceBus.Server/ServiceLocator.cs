@@ -21,6 +21,11 @@ namespace MyServiceBus.Server
 {
     public static class ServiceLocator
     {
+
+        public const int Http1Port = 6123;
+        public const int Http2Port = 6122;
+        public const int TcpPort = 6421;
+            
         public static int TcpConnectionsSnapshotId { get; set; }
         
         static ServiceLocator()
@@ -49,8 +54,8 @@ namespace MyServiceBus.Server
             Console.WriteLine($"AspNetEnvironment: {AspNetEnvironment}");
             Console.WriteLine($"Host: {Host}");
             Console.WriteLine($"StartedAt: {StartedAt}");
-            Console.WriteLine($"Port (http1 and http2): 6123");
-            Console.WriteLine($"Port (http2): 6124");
+            Console.WriteLine($"Port (http1 and http2): {Http1Port}");
+            Console.WriteLine($"Port (http2): {Http2Port}");
             Console.WriteLine();
         }
 

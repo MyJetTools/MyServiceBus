@@ -29,10 +29,10 @@ namespace MyServiceBus.Server
                     webBuilder.ConfigureKestrel(options =>
                         {
                             
-                            options.Listen(IPAddress.Any,  6123,
+                            options.Listen(IPAddress.Any,  ServiceLocator.Http1Port,
                                 o => o.Protocols = HttpProtocols.Http1AndHttp2);
                             
-                            options.Listen(IPAddress.Any,  6122,
+                            options.Listen(IPAddress.Any,  ServiceLocator.Http2Port,
                                 o => o.Protocols = HttpProtocols.Http2);
                             
                         }) 

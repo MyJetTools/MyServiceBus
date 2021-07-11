@@ -18,6 +18,8 @@ namespace MyServiceBus.Server
 {
     public class Startup
     {
+        
+
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -88,7 +90,7 @@ namespace MyServiceBus.Server
                         
             ServiceLocator.Init(sp);
             ServiceLocator.TcpServer =
-                new MyServerTcpSocket<IServiceBusTcpContract>(new IPEndPoint(IPAddress.Any, 6421))
+                new MyServerTcpSocket<IServiceBusTcpContract>(new IPEndPoint(IPAddress.Any, ServiceLocator.TcpPort))
                     .RegisterSerializer(() => new MyServiceBusTcpSerializer())
                     .SetService(() => new MyServiceBusTcpContext())
                     .Logs.AddLogInfo((ctx, data) =>
