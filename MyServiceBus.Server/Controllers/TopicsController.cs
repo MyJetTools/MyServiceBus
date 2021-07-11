@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using MyServiceBus.Domains.Execution;
+using MyServiceBus.Persistence.Grpc;
 using MyServiceBus.Server.Models;
 
 namespace MyServiceBus.Server.Controllers
@@ -32,8 +34,14 @@ namespace MyServiceBus.Server.Controllers
             if (session == null)
                 return Forbid();
             
-            var bytes = Convert.FromBase64String(messageBase64); 
-            var result = await ServiceLocator.MyServiceBusPublisher.PublishAsync(session.SessionContext, topicId, new[] {bytes}, DateTime.UtcNow, persistImmediately);
+            var bytes = Convert.FromBase64String(messageBase64);
+
+            var publishMessage = new PublishMessage
+            {
+                MetaData = Array.Empty<MessageContentMetaDataItem>(),
+                Data = bytes
+            };
+            var result = await ServiceLocator.MyServiceBusPublisher.PublishAsync(session.SessionContext, topicId, new[] {publishMessage}, DateTime.UtcNow, persistImmediately);
             return Json(new {result});
         }
 

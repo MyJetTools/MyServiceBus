@@ -5,9 +5,17 @@ using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
 using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
+using MyServiceBus.Persistence.Grpc;
 
 namespace MyServiceBus.Domains.Execution
 {
+
+    public class PublishMessage
+    {
+        public MessageContentMetaDataItem[] MetaData { get; set; }
+        
+        public byte[] Data { get; set; }
+    }
     
     public class MyServiceBusPublisher
     {
@@ -36,7 +44,7 @@ namespace MyServiceBus.Domains.Execution
         
 
         public async ValueTask<ExecutionResult> PublishAsync(MyServiceBusSessionContext sessionContext, 
-            string topicId, IEnumerable<byte[]> messages, DateTime now, 
+            string topicId, IEnumerable<PublishMessage> messages, DateTime now, 
             bool persistImmediately)
         {
             

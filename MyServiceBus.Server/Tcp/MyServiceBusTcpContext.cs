@@ -70,9 +70,12 @@ namespace MyServiceBus.Server.Tcp
 
             var now = DateTime.UtcNow;
 
+            var messages = contract.Data.Select(msg => new PublishMessage
+                { Data = msg, MetaData = Array.Empty<MessageContentMetaDataItem>() });
+
             var response = await ServiceLocator
                 .MyServiceBusPublisher
-                .PublishAsync(SessionContext, contract.TopicId, contract.Data, now, contract.ImmediatePersist == 1);
+                .PublishAsync(SessionContext, contract.TopicId, messages, now, contract.ImmediatePersist == 1);
 
             if (response != ExecutionResult.Ok)
                 return "Can not publish the message. Reason: " + response;

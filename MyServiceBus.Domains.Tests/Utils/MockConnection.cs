@@ -65,7 +65,14 @@ namespace MyServiceBus.Domains.Tests.Utils
         public ExecutionResult PublishMessage( string topicName, byte[] message, DateTime dateTime, bool persistImmediately = false)
         {
             topicName = topicName.ToLower();
-            return Publisher.PublishAsync(MyServiceBusSessionContext, topicName, new[] {message}, dateTime, persistImmediately).Result;
+
+            var publishMessage = new PublishMessage
+            {
+                Data = message,
+                MetaData = Array.Empty<MessageContentMetaDataItem>()
+            };
+            
+            return Publisher.PublishAsync(MyServiceBusSessionContext, topicName, new[] {publishMessage}, dateTime, persistImmediately).Result;
         }
         
         public MyTopic CreateTopic(string topicName)

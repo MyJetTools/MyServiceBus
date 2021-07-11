@@ -15,16 +15,19 @@ namespace MyServiceBus.Server.Services.Sessions
             LastAccess = utcNow;
         }
         
-        public GrpcSession(long id, string name)
+        public GrpcSession(long id, string name, string clientVersion)
         {
             Id = id;
             Name = name;
+            ClientVersion = clientVersion;
         }
         public long Id { get; }
 
         public MyServiceBusSessionContext SessionContext = new ();
         
         public string Name { get; }
+        
+        public string ClientVersion { get; }
 
     }
     

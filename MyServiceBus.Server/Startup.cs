@@ -54,10 +54,6 @@ namespace MyServiceBus.Server
             
             services.AddSingleton<IMessagesToPersistQueue, MessagesToPersistQueue>();
 
-            
-
-
-
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -82,8 +78,8 @@ namespace MyServiceBus.Server
                 endpoints =>
                 {
                     endpoints.MapControllers();
-                    endpoints.MapGrpcService<PublisherApi>();
-                    endpoints.MapGrpcService<ManagementGrpcService>();
+                    endpoints.MapGrpcService<PublisherGrpcApi>();
+                    endpoints.MapGrpcService<SessionsGrpcApi>();
                     endpoints.MapMetrics();
                     endpoints.MapHub<MonitoringHub>("/monitoringhub");
                 });

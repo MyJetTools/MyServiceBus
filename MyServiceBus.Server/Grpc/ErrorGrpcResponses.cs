@@ -1,28 +1,30 @@
-using MyServiceBus.Grpc.Contracts;
-using MyServiceBus.Grpc.Models;
+
+using MyServiceBus.GrpcContracts;
 
 namespace MyServiceBus.Server.Grpc
 {
-    public static class ErrorGrpcResponses
+    public static class GrpcResponses
     {
-        public static readonly PublishMessageGrpcResponse TopicNotFoundGrpcResponse = new PublishMessageGrpcResponse
+        public static readonly MyServiceBusGrpcResponse OkResponse = new()
         {
-            Status  = GrpcResponseStatus.TopicNotFound
+            Status  = MyServiceBusResponseStatus.Ok
         };
         
-        public static readonly PublishMessageGrpcResponse SessionExpired = new PublishMessageGrpcResponse
+        public static readonly MyServiceBusGrpcResponse TopicNotFoundGrpcResponse = new()
         {
-            Status  = GrpcResponseStatus.SessionExpired
+            Status  = MyServiceBusResponseStatus.TopicNotFound
         };
         
-        public static readonly SubscribeGrpcResponse SubscribeSessionExpired = new SubscribeGrpcResponse
+        public static readonly MyServiceBusGrpcResponse InvalidSession = new ()
         {
-            Status  = GrpcResponseStatus.SessionExpired
+            Status  = MyServiceBusResponseStatus.InvalidSession
         };
+        
 
-        public static readonly SubscribeGrpcResponse SubscribeTopicNotFound = new SubscribeGrpcResponse
+
+        public static readonly MyServiceBusGrpcResponse SubscribeTopicNotFound = new ()
         {
-            Status  = GrpcResponseStatus.TopicNotFound
+            Status  = MyServiceBusResponseStatus.TopicNotFound
         };
     }
 }

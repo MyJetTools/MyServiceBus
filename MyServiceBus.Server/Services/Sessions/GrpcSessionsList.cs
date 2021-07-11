@@ -28,12 +28,12 @@ namespace MyServiceBus.Server.Services.Sessions
             return _sessionId++;
         }
         
-        public GrpcSession GenerateNewSession(string name)
+        public GrpcSession GenerateNewSession(string name, string clientVersion)
         {
             _readerWriterLock.EnterWriteLock();
             try
             {
-                var result = new GrpcSession(GetSessionId(), name);
+                var result = new GrpcSession(GetSessionId(), name, clientVersion);
                 _sessions.Add(result.Id, result);
                 _sessionsAsList = _sessions.Values.ToList();
                 return result;

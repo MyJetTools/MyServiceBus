@@ -8,9 +8,9 @@ namespace MyServiceBus.Server.Controllers
     public class GreetingController : Controller
     {
         [HttpPost("Greeting")]
-        public long Index([FromForm][Required]string name)
+        public long Index([FromForm][Required]string name, [FromForm][Required]string clientVersion)
         {
-            var grpcSession = ServiceLocator.GrpcSessionsList.GenerateNewSession(name);
+            var grpcSession = ServiceLocator.GrpcSessionsList.GenerateNewSession(name, clientVersion);
             return grpcSession.Id;
         }
         

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
+using MyServiceBus.Domains.Execution;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
 using MyServiceBus.Domains.Queues;
@@ -76,7 +77,7 @@ namespace MyServiceBus.Domains.Topics
             return _topicQueueList.CreateQueueIfNotExists(this, queueName, topicQueueType, MessageId.Value, overrideTopicQueueType);
         }
 
-        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<byte[]> messages, DateTime now)
+        public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<PublishMessage> messages, DateTime now)
         {
             _requestsPerSecond++;
 
@@ -91,7 +92,8 @@ namespace MyServiceBus.Domains.Topics
                     {
                         MessageId = generator.GetNextMessageId(),
                         Created = now,
-                        Data = message
+                        Data = message.Data,
+                        MetaData = message.MetaData
                     };
 
                     newMessages.Add(newMessage);
