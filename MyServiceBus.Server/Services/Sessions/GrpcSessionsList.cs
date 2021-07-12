@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using MyServiceBus.Domains;
+using MyServiceBus.Domains.Sessions;
 
 namespace MyServiceBus.Server.Services.Sessions
 {
@@ -28,12 +29,12 @@ namespace MyServiceBus.Server.Services.Sessions
             return _sessionId++;
         }
         
-        public GrpcSession GenerateNewSession(string name, string clientVersion)
+        public GrpcSession GenerateNewSession(MyServiceBusSession session)
         {
             _readerWriterLock.EnterWriteLock();
             try
             {
-                var result = new GrpcSession(GetSessionId(), name, clientVersion);
+                var result = new GrpcSession(GetSessionId(), session);
                 _sessions.Add(result.Id, result);
                 _sessionsAsList = _sessions.Values.ToList();
                 return result;
@@ -52,7 +53,9 @@ namespace MyServiceBus.Server.Services.Sessions
             try
             {
                 var result = _sessions.TryGetOrDefault(sessionId);
-                result?.UpdateLastAccess(utcNow);
+                if (result != null)
+                    result.Session.LastAccessTime = utcNow;    
+                
                 return result;
             }
             finally
@@ -69,7 +72,7 @@ namespace MyServiceBus.Server.Services.Sessions
         {
             List<GrpcSession> result = null;
 
-            foreach (var grpcSession in _sessionsAsList.Where(grpcSession => now - grpcSession.LastAccess >= OneMinute)
+            foreach (var grpcSession in _sessionsAsList.Where(grpcSession => now - grpcSession.Session.LastAccessTime >= OneMinute)
             )
             {
                 result ??= new List<GrpcSession>();

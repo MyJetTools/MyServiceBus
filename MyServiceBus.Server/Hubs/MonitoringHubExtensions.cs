@@ -84,19 +84,15 @@ namespace MyServiceBus.Server.Hubs
 
             try
             {
-                var contract = ServiceLocator.TopicsList.Get()
-                    .ToDictionary(topic => topic.TopicId, 
-                        topic =>
-                        {
-                            var result = ServiceLocator.MessagesPerSecondByTopic.GetRecordsPerSecond(topic.TopicId);
-                            return result.All(itm => itm == 0) ? Array.Empty<int>() : result;
-                        });
-            
-                connection.CompressGraph(contract);
+                var graphs = ServiceLocator.TopicsList.Get()
+                    .ToDictionary(itm => itm.TopicId, itm => itm.Metrics.GetPublishPerSecondHistory());
 
-                return contract.Count ==0 
+            
+                connection.CompressGraph(graphs);
+
+                return graphs.Count ==0 
                     ? new ValueTask() 
-                    : new ValueTask(connection.ClientProxy.SendAsync("topic-performance-graph", contract));
+                    : new ValueTask(connection.ClientProxy.SendAsync("topic-performance-graph", graphs));
             }
             catch (Exception e)
             {
@@ -152,13 +148,8 @@ namespace MyServiceBus.Server.Hubs
 
             try
             {
-                var connections = ServiceLocator
-                    .TcpServer
-                    .GetConnections()
-                    .Cast<MyServiceBusTcpContext>()
-                    .OrderBy(itm => itm.ContextName.ToLowerInvariant());
-            
-                await connection.ClientProxy.SendAsync("connections", connections.Select(conn => conn.ToTcpConnectionHubModel()));
+                var connections = ConnectionsAggregator.GetConnections();
+                await connection.ClientProxy.SendAsync("connections", connections);
 
             }
             catch (Exception e)

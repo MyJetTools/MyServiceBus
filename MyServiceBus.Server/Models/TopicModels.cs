@@ -12,7 +12,7 @@ namespace MyServiceBus.Server.Models
             return new ()
             {
                 Id = topic.TopicId,
-                MessageId = topic.MessageId.Value
+                MessageId = topic.MessageIdGenerator.Value
             };
         }
         

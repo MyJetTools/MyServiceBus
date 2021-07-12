@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Domains.Tests.Utils;
 using NUnit.Framework;
@@ -8,7 +9,7 @@ namespace MyServiceBus.Domains.Tests
     public class TestDeleteQueueOnDisconnect
     {
         [Test]
-        public void TestDeleteOnDisconnect()
+        public async Task TestDeleteOnDisconnect()
         {
             var ioc = TestIoc.CreateForTests();
 
@@ -19,7 +20,7 @@ namespace MyServiceBus.Domains.Tests
             
             var session = ioc.ConnectSession("MySession", nowTime);
             var topic = session.CreateTopic(topicName);
-            session.Subscribe(topicName, queueName);
+            await session.SubscribeAsync(topicName, queueName);
 
             var queues = topic.GetQueues();
             Assert.AreEqual(1, queues.Count);
@@ -32,7 +33,7 @@ namespace MyServiceBus.Domains.Tests
         }
         
         [Test]
-        public void TestNotDeleteOnDisconnect()
+        public async Task TestNotDeleteOnDisconnect()
         {
             var ioc = TestIoc.CreateForTests();
 
@@ -43,7 +44,7 @@ namespace MyServiceBus.Domains.Tests
             
             var session = ioc.ConnectSession("MySession", nowTime);
             var topic = session.CreateTopic(topicName);
-            session.Subscribe(topicName, queueName, TopicQueueType.Permanent);
+            await session.SubscribeAsync(topicName, queueName, TopicQueueType.Permanent);
 
             var queues = topic.GetQueues();
             Assert.AreEqual(1, queues.Count);

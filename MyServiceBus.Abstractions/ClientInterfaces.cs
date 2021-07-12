@@ -11,7 +11,7 @@ namespace MyServiceBus.Abstractions
         Task PublishAsync(string topicId, IEnumerable<byte[]> valueToPublish, bool immediatelyPersist);
     }
 
-
+/*
     public interface IMyServiceBusSubscriber
     {
         void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
@@ -20,5 +20,6 @@ namespace MyServiceBus.Abstractions
         void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
             Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callback);
     }
+    */
     
 }

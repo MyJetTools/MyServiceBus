@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using MyServiceBus.Domains.Tests.Utils;
 using NUnit.Framework;
 
@@ -28,7 +29,7 @@ namespace MyServiceBus.Domains.Tests
         
         
         [Test]
-        public void TestFirstSubscribeNextPublish()
+        public async Task TestFirstSubscribeNextPublish()
         {
             var ioc = TestIoc.CreateForTests();
 
@@ -38,7 +39,7 @@ namespace MyServiceBus.Domains.Tests
             var session = ioc.ConnectSession("MySession");
             session.CreateTopic(topicName);
 
-            session.Subscribe(topicName, queueName);
+            await session.SubscribeAsync(topicName, queueName);
 
             var message = new byte[] {1, 2, 3};
 

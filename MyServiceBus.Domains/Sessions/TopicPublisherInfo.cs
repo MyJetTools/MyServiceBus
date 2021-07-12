@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace MyServiceBus.Domains.Sessions
 {
@@ -10,7 +9,8 @@ namespace MyServiceBus.Domains.Sessions
         private Dictionary<string, DateTime> _topicsPublishers = new ();
 
 
-        public readonly MetricPerSecond PublishMetricPerSecond = new ();
+        public readonly MetricPerSecond PublishPayloadsPerSecond = new ();
+        public readonly MetricPerSecond PublishMessagesPerSecond = new ();
 
 
         public void AddIfNotExists(string topic)
@@ -41,6 +41,13 @@ namespace MyServiceBus.Domains.Sessions
         public Dictionary<string, DateTime> GetTopicsToPublish()
         {
             return _topicsPublishers;
+        }
+
+
+        public void OneSecondTimer()
+        {
+            PublishMessagesPerSecond.OneSecondTimer();
+            PublishPayloadsPerSecond.OneSecondTimer();
         }
     }
 }

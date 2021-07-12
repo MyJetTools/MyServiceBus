@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Domains.Tests.Utils;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ namespace MyServiceBus.Domains.Tests
     {
 
         [Test]
-        public void TestPublishSubscribeDisconnectWithoutConfirmationAndMessagesGoesBackToQueue()
+        public async Task TestPublishSubscribeDisconnectWithoutConfirmationAndMessagesGoesBackToQueue()
         {
             var ioc = TestIoc.CreateForTests();
 
@@ -21,12 +22,12 @@ namespace MyServiceBus.Domains.Tests
             
             var session = ioc.ConnectSession("MySession", nowTime);
             session.CreateTopic(topicName);
-            session.Subscribe(topicName, queueName, TopicQueueType.Permanent);
+            var subscriber = await session.SubscribeAsync(topicName, queueName, TopicQueueType.Permanent);
             
             session.PublishMessage(topicName, new byte[] {1, 2, 3}, nowTime);
 
             Assert.AreEqual(0, ioc.GetMessagesCount(topicName, queueName));
-            Assert.AreEqual(1, ioc.GetLeasedMessagesCount(topicName, queueName));
+            Assert.AreEqual(1,  subscriber.MessagesOnDelivery.Count);
             
             var lastDelivered = session.GetLastSentMessage();
 
@@ -37,14 +38,14 @@ namespace MyServiceBus.Domains.Tests
             Assert.AreEqual(1, ioc.GetMessagesCount(topicName, queueName));
             
             var session2 = ioc.ConnectSession("MySession2", nowTime);
-            session2.Subscribe(topicName, queueName);
+            var subscriber2 = await session2.SubscribeAsync(topicName, queueName);
             Assert.AreEqual(0, ioc.GetMessagesCount(topicName, queueName));
-            Assert.AreEqual(1, ioc.GetLeasedMessagesCount(topicName, queueName));
+            Assert.AreEqual(1, subscriber2.MessagesOnDelivery.Count);
         }
 
 
         [Test]
-        public void TestDisconnectImmediateConnectAndSeveralPublishes()
+        public async Task TestDisconnectImmediateConnectAndSeveralPublishes()
         {
             var ioc = TestIoc.CreateForTests();
 
@@ -56,7 +57,7 @@ namespace MyServiceBus.Domains.Tests
             var session = ioc.ConnectSession("MySession", nowTime);
            
             session.CreateTopic(topicName);
-            var queue = session.Subscribe(topicName, queueName);
+            var queue = session.SubscribeAsync(topicName, queueName);
             
             session.PublishMessage(topicName, new byte[] {1}, nowTime);
             session.PublishMessage(topicName, new byte[] {2}, nowTime);
@@ -68,7 +69,7 @@ namespace MyServiceBus.Domains.Tests
             var lastMessage = session.GetLastSentMessage();
             
             var session2 = ioc.ConnectSession("MySession2", nowTime);
-            session2.Subscribe(topicName, queueName);
+            await session2.SubscribeAsync(topicName, queueName);
             Console.WriteLine("Subscribe to Sess2:     "+queue);
             
             session2.PublishMessage(topicName, new byte[] {2}, nowTime);
@@ -77,7 +78,7 @@ namespace MyServiceBus.Domains.Tests
          //   Assert.AreEqual(2, queue.GetLeasedMessagesCount());
             
             var lastMessageSession2 = session2.GetLastSentMessage();
-            session2.ConfirmDelivery(queue, lastMessageSession2.confirmationId);
+            await session2.ConfirmDeliveryAsync(lastMessageSession2.topicQueue, lastMessageSession2.confirmationId);
             Console.WriteLine("Confirm delivery:       "+queue);
  
             session2.PublishMessage(topicName, new byte[] {3}, nowTime);
@@ -91,7 +92,7 @@ namespace MyServiceBus.Domains.Tests
             
             
             lastMessageSession2 = session2.GetLastSentMessage();
-            session2.ConfirmDelivery(queue, lastMessageSession2.confirmationId);
+            await session2.ConfirmDeliveryAsync(lastMessageSession2.topicQueue, lastMessageSession2.confirmationId);
             Console.WriteLine("6:                      "+queue);
 
             

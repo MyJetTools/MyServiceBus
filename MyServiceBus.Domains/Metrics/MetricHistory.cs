@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace MyServiceBus.Domains.Metrics
 {
-    public class MetricList<T>
+    public class MetricHistory<T>
     {
         private readonly Queue<T> _items = new ();
 
@@ -32,10 +32,10 @@ namespace MyServiceBus.Domains.Metrics
         public long SnapshotId { get; private set; }
     }
 
-    public class MetricsByTopic<T>
+    public class MetricsHistoryByTopic<T>
     {
         
-        private readonly Dictionary<string, MetricList<T>> _messagesPerSeconds = new ();
+        private readonly Dictionary<string, MetricHistory<T>> _messagesPerSeconds = new ();
 
         private readonly ReaderWriterLockSlim _lockSlim = new ();
 
@@ -50,7 +50,7 @@ namespace MyServiceBus.Domains.Metrics
                     return;
                 }
 
-                list = new MetricList<T>();
+                list = new MetricHistory<T>();
                 _messagesPerSeconds.Add(topicId, list);
                 list.PutData(amount);
             }

@@ -1,5 +1,5 @@
 using System;
-using MyServiceBus.Domains.Queues;
+using System.Threading.Tasks;
 using MyServiceBus.Domains.Tests.Utils;
 using NUnit.Framework;
 
@@ -9,7 +9,7 @@ namespace MyServiceBus.Domains.Tests
     {
 
         [Test]
-        public void TestMinMessageIdCleaning()
+        public async Task TestMinMessageIdCleaning()
         {
 
             var ioc = TestIoc.CreateForTests();
@@ -22,23 +22,24 @@ namespace MyServiceBus.Domains.Tests
             var session = ioc.ConnectSession("MySession", nowTime);
             
             session.CreateTopic(topicName);
-            var queue = session.Subscribe(topicName, queueName);
+            var subscriber = await session.SubscribeAsync(topicName, queueName);
+
 
             
             session.PublishMessage(topicName, new byte[] {0}, nowTime);
-            Assert.AreEqual(0, queue.GetMessagesCount());
-            Assert.AreEqual(1, queue.GetLeasedMessagesCount());
+            Assert.AreEqual(0, subscriber.TopicQueue.GetMessagesCount());
+            Assert.AreEqual(1, subscriber.MessagesOnDelivery.Count);
             var firstSent = session.GetLastSentMessage();
             
             session.PublishMessage(topicName, new byte[] {1}, nowTime);
             
-            Assert.AreEqual(1, queue.GetMessagesCount());
-            Assert.AreEqual(1, queue.GetLeasedMessagesCount());
+            Assert.AreEqual(1, subscriber.TopicQueue.GetMessagesCount());
+            Assert.AreEqual(1, subscriber.MessagesOnDelivery.Count);
 
-            session.ConfirmDelivery(firstSent.topicQueue, firstSent.confirmationId);
+            await session.ConfirmDeliveryAsync(firstSent.topicQueue, firstSent.confirmationId);
             
-            Assert.AreEqual(0, queue.GetMessagesCount());
-            Assert.AreEqual(1, queue.GetLeasedMessagesCount());
+            Assert.AreEqual(0, subscriber.TopicQueue.GetMessagesCount());
+            Assert.AreEqual(1, subscriber.MessagesOnDelivery.Count);
             
        
         }

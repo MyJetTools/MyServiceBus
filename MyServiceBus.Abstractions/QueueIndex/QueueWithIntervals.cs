@@ -174,5 +174,17 @@ namespace MyServiceBus.Abstractions.QueueIndex
 
             _ranges[0].FromId = _ranges[0].ToId+1;
         }
+
+
+        public bool HasMessageId(long messageId)
+        {
+            foreach (var range in _ranges.Where(itm => !itm.IsEmpty()))
+            {
+                if (range.FromId <= messageId && messageId <= range.ToId)
+                    return true;
+            }
+
+            return false;
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
@@ -17,23 +18,26 @@ namespace MyServiceBus.Domains.Execution
         public byte[] Data { get; set; }
     }
     
-    public class MyServiceBusPublisher
+    public class MyServiceBusPublisherOperations
     {
         private readonly TopicsList _topicsList;
         private readonly IMessagesToPersistQueue _messagesToPersistQueue;
         private readonly MyServiceBusDeliveryHandler _myServiceBusDeliveryHandler;
         private readonly MessageContentPersistentProcessor _messageContentPersistentProcessor;
+        private readonly TopicsAndQueuesPersistenceProcessor _topicsAndQueuesPersistenceProcessor;
 
-        public MyServiceBusPublisher(TopicsList topicsList, 
+        public MyServiceBusPublisherOperations(TopicsList topicsList, 
             IMessagesToPersistQueue messagesToPersistQueue,
             MyServiceBusDeliveryHandler myServiceBusDeliveryHandler, 
-            MessageContentPersistentProcessor messageContentPersistentProcessor
+            MessageContentPersistentProcessor messageContentPersistentProcessor,
+            TopicsAndQueuesPersistenceProcessor topicsAndQueuesPersistenceProcessor
             )
         {
             _topicsList = topicsList;
             _messagesToPersistQueue = messagesToPersistQueue;
             _myServiceBusDeliveryHandler = myServiceBusDeliveryHandler;
             _messageContentPersistentProcessor = messageContentPersistentProcessor;
+            _topicsAndQueuesPersistenceProcessor = topicsAndQueuesPersistenceProcessor;
         }
 
 
@@ -41,9 +45,17 @@ namespace MyServiceBus.Domains.Execution
         {
             Task.Run(()=>_messageContentPersistentProcessor.PersistMessageContentAsync(topic));
         }
+
+        public async ValueTask<MyTopic> CreateTopicIfNotExists(MyServiceBusSession session, string topicId)
+        {
+            var topic = _topicsList.AddIfNotExists(topicId);
+            await _topicsAndQueuesPersistenceProcessor.PersistTopicsAndQueuesInBackgroundAsync(_topicsList.Get());
+            session.PublisherInfo.AddIfNotExists(topicId);
+            return topic;
+        }
         
 
-        public async ValueTask<ExecutionResult> PublishAsync(MyServiceBusSessionContext sessionContext, 
+        public async ValueTask<ExecutionResult> PublishAsync(MyServiceBusSession session, 
             string topicId, IEnumerable<PublishMessage> messages, DateTime now, 
             bool persistImmediately)
         {
@@ -53,7 +65,7 @@ namespace MyServiceBus.Domains.Execution
             if (topic == null)
                 return ExecutionResult.TopicNotFound;
             
-            sessionContext.PublisherInfo.AddIfNotExists(topicId);
+            session.PublisherInfo.AddIfNotExists(topicId);
             
             var addedMessages = topic.Publish(messages, now);
 
@@ -66,7 +78,7 @@ namespace MyServiceBus.Domains.Execution
                 PersistMessagesContent(topic);
 
             foreach (var topicQueue in topic.GetQueues())
-                topicQueue.EnqueueMessages(addedMessages);
+                topicQueue.EnqueueMessages(addedMessages.Select(itm => itm.MessageId));
 
             await _myServiceBusDeliveryHandler.SendMessagesAsync(topic);
 

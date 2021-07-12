@@ -10,7 +10,10 @@ namespace MyServiceBus.Server.Controllers
         [HttpPost("Greeting")]
         public long Index([FromForm][Required]string name, [FromForm][Required]string clientVersion)
         {
-            var grpcSession = ServiceLocator.GrpcSessionsList.GenerateNewSession(name, clientVersion);
+            var session = ServiceLocator.SessionsList.IssueSession();
+            session.Name = name;
+            session.ClientVersion = clientVersion;
+            var grpcSession = ServiceLocator.GrpcSessionsList.GenerateNewSession(session);
             return grpcSession.Id;
         }
         

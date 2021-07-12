@@ -19,11 +19,9 @@ namespace MyServiceBus.Server.Grpc
             if (grpcSession == null)
                 return GrpcResponses.InvalidSession;
             
-            Console.WriteLine($"Creating topic {contract.TopicId} for connection: "+grpcSession.Name);
+            Console.WriteLine($"Creating topic {contract.TopicId} for connection: "+grpcSession.Session.Name);
             
-            await ServiceLocator.TopicsManagement.AddIfNotExistsAsync(contract.TopicId);
-
-            grpcSession.SessionContext.PublisherInfo.AddIfNotExists(contract.TopicId);
+            await ServiceLocator.MyServiceBusPublisherOperations.CreateTopicIfNotExists(grpcSession.Session, contract.TopicId);
             
             return GrpcResponses.OkResponse;
         }
@@ -46,12 +44,12 @@ namespace MyServiceBus.Server.Grpc
                 { Data = msg.Content, MetaData = msg.Headers.ToMessageMetaData() });
 
             var response = await ServiceLocator
-                .MyServiceBusPublisher
-                .PublishAsync(session.SessionContext, request.TopicId, publishMessages, now, false);
+                .MyServiceBusPublisherOperations
+                .PublishAsync(session.Session, request.TopicId, publishMessages, now, false);
 
             if (response == ExecutionResult.TopicNotFound)
             {
-                Console.WriteLine($"Attempt to write to Topic {request.TopicId} which does not exist. Disconnecting session for app: "+session.Name);
+                Console.WriteLine($"Attempt to write to Topic {request.TopicId} which does not exist. Disconnecting session for app: "+session.Session.Name);
                 return GrpcResponses.TopicNotFoundGrpcResponse;
             }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using DotNetCoreDecorators;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Domains.Tests.Utils;
@@ -10,7 +11,7 @@ namespace MyServiceBus.Domains.Tests
     {
 
         [Test]
-        public void TestPersistence()
+        public async Task TestPersistence()
         {
             var ioc = TestIoc.CreateForTests();
             
@@ -21,7 +22,7 @@ namespace MyServiceBus.Domains.Tests
             var session = ioc.ConnectSession("MySession", nowTime);
             
             session.CreateTopic(topicName);
-            session.Subscribe(topicName, queueName, TopicQueueType.Permanent);
+            await session.SubscribeAsync(topicName, queueName, TopicQueueType.Permanent);
             
             session.PublishMessage(topicName, new byte[] {0}, nowTime);
             session.PublishMessage(topicName, new byte[] {1}, nowTime);
@@ -54,7 +55,7 @@ namespace MyServiceBus.Domains.Tests
         
         
         [Test]
-        public void TestWhenWeDeliverHalfAndNotDeliverHalf()
+        public async Task TestWhenWeDeliverHalfAndNotDeliverHalf()
         {
             var ioc = TestIoc.CreateForTests();
             
@@ -67,7 +68,7 @@ namespace MyServiceBus.Domains.Tests
             var session = ioc.ConnectSession("MySession");
             
             session.CreateTopic(topicName);
-            session.Subscribe(topicName, queueName,TopicQueueType.Permanent);
+            await session.SubscribeAsync(topicName, queueName,TopicQueueType.Permanent);
 
 
             session.PublishMessage(topicName, new byte[] {0}, nowTime);

@@ -16,15 +16,13 @@ namespace MyServiceBus.Domains
             sc.AddSingleton<TopicsList>();
             sc.AddSingleton<GlobalVariables>();
             
-            sc.AddSingleton<MyServiceBusPublisher>();
-            sc.AddSingleton<MyServiceBusSubscriber>();
+            sc.AddSingleton<MyServiceBusPublisherOperations>();
+            sc.AddSingleton<MyServiceBusSubscriberOperations>();
             sc.AddSingleton<MyServiceBusBackgroundExecutor>();
             
             sc.AddSingleton<TopicsAndQueuesPersistenceProcessor>();
             
             sc.AddSingleton<MessageContentPersistentProcessor>();
-            
-            sc.AddSingleton<TopicsManagement>();
             
             sc.AddSingleton<MyServiceBusDeliveryHandler>();
 
@@ -32,6 +30,8 @@ namespace MyServiceBus.Domains
 
             sc.AddSingleton<MessagesPerSecondByTopic>();
             sc.AddSingleton<MessagesPageLoader>();
+
+            sc.AddSingleton<SessionsList>();
         }
         
         

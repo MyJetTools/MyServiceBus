@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Domains;
 using MyServiceBus.Domains.Execution;
-using MyServiceBus.Domains.Metrics;
 using MyServiceBus.Domains.Persistence;
+using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
 using MyServiceBus.Server.Hubs;
 using MyServiceBus.Server.Services;
@@ -69,39 +69,40 @@ namespace MyServiceBus.Server
 
         public static string AspNetEnvironment { get;  }
         public static string Host { get; }
-        public static TopicsManagement TopicsManagement { get; private set; }
         public static TopicsList TopicsList { get; private set; }
         public static GlobalVariables MyGlobalVariables { get; private set; }
-        public static MyServiceBusPublisher MyServiceBusPublisher { get; private set; }
-        public static MyServiceBusSubscriber Subscriber { get; private set; }
+        public static MyServiceBusPublisherOperations MyServiceBusPublisherOperations { get; private set; }
         public static MyServiceBusBackgroundExecutor MyServiceBusBackgroundExecutor { get; private set; }
         public static MyServerTcpSocket<IServiceBusTcpContract> TcpServer { get; internal set; }
         public static IMessagesToPersistQueue MessagesToPersistQueue { get; private set; }
-        public static MessagesPerSecondByTopic MessagesPerSecondByTopic { get; private set; }
         public static GrpcSessionsList GrpcSessionsList { get; private set; }
+        
+        public static MyServiceBusSubscriberOperations SubscriberOperations { get; private set; }
 
         private static IMetricCollector _metricCollector;
+        
+        public static SessionsList SessionsList { get; private set; }
 
         public static void Init(IServiceProvider serviceProvider)
         {
 
             GrpcSessionsList = serviceProvider.GetRequiredService<GrpcSessionsList>();
             
-            MessagesPerSecondByTopic = serviceProvider.GetRequiredService<MessagesPerSecondByTopic>();
+            SubscriberOperations = serviceProvider.GetRequiredService<MyServiceBusSubscriberOperations>();
             
-            TopicsManagement = serviceProvider.GetRequiredService<TopicsManagement>();
             TopicsList = serviceProvider.GetRequiredService<TopicsList>();
             
             MyGlobalVariables = serviceProvider.GetRequiredService<GlobalVariables>();
 
-            MyServiceBusPublisher = serviceProvider.GetRequiredService<MyServiceBusPublisher>();
-            Subscriber = serviceProvider.GetRequiredService<MyServiceBusSubscriber>();
+            MyServiceBusPublisherOperations = serviceProvider.GetRequiredService<MyServiceBusPublisherOperations>();
 
             MessagesToPersistQueue = serviceProvider.GetRequiredService<IMessagesToPersistQueue>();
             
             MyServiceBusBackgroundExecutor = serviceProvider.GetRequiredService<MyServiceBusBackgroundExecutor>();
 
             _metricCollector = serviceProvider.GetRequiredService<IMetricCollector>();
+
+            SessionsList = serviceProvider.GetRequiredService<SessionsList>();
 
             DataInitializer.InitAsync(serviceProvider).Wait();
         }
@@ -136,7 +137,9 @@ namespace MyServiceBus.Server
 
             TimerStatistic.Register("Metrics timer", () =>
             {
-                TopicsList.KickMetricsTimer();
+                TopicsList.OenSecondTimer();
+                
+                SessionsList.OneSecondTimer();
                 
                 
                 var connections = TcpServer.GetConnections();
@@ -149,7 +152,6 @@ namespace MyServiceBus.Server
 
                 foreach (var myTopic in TopicsList.Get())
                 {
-                    MessagesPerSecondByTopic.PutData(myTopic.TopicId, myTopic.MessagesPerSecond);
                     _metricCollector.UpdateTopicQueueSize(myTopic);
 
                     foreach (var queue in myTopic.GetQueues())
@@ -165,12 +167,7 @@ namespace MyServiceBus.Server
             
             TimerStatistic.Register("Prometheus", () =>
             {
-
-                foreach (var topic in TopicsList.Get())
-                {
-
-                }
-                
+                //ToDo - Plug Prometheus
                 
                 return new ValueTask();
             });

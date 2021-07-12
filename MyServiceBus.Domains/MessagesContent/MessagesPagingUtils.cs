@@ -25,9 +25,9 @@ namespace MyServiceBus.Domains.MessagesContent
             foreach (var queue in topic.GetQueues())
             {
                 
-                var pageId = queue.GetMinId().GetMessageContentPageId();
+                var pageId = queue.GetMinMessageId().GetMessageContentPageId();
 
-                var maxPageId = topic.MessageId.Value.GetMessageContentPageId();
+                var maxPageId = topic.MessageIdGenerator.Value.GetMessageContentPageId();
                 
                 if (!result.ContainsKey(pageId.Value))
                     result.Add(pageId.Value, pageId.Value);

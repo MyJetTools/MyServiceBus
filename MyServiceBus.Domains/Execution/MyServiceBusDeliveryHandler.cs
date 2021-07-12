@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
@@ -23,8 +24,32 @@ namespace MyServiceBus.Domains.Execution
             _log = log;
         }
 
-        private async ValueTask FillMessagesAsync(TopicQueue topicQueue, TheQueueSubscriber subscriber)
+        private async ValueTask<MessagesPage> GetMessagesPageAsync(TopicQueue topicQueue, MessagesPageId pageId)
         {
+
+            var result = topicQueue.Topic.MessagesContentCache.TryGetPage(pageId);
+
+            if (result != null)
+                return result;
+
+            using (await topicQueue.Topic.MessagesPersistenceLock.LockAsync())
+            {
+                result = topicQueue.Topic.MessagesContentCache.TryGetPage(pageId);
+
+                if (result != null)
+                    return result;
+
+
+                return await _messagesPageLoader.LoadPageAsync(topicQueue.Topic, pageId);
+            }
+
+        }
+
+        private async ValueTask FillMessagesAsync(TopicQueue topicQueue, QueueSubscriber subscriber)
+        {
+
+            MessagesPage messagesPage = null;
+            
             foreach (var (messageId, attemptNo) in topicQueue.DequeNextMessage())
             {
 
@@ -32,30 +57,30 @@ namespace MyServiceBus.Domains.Execution
                     return;
 
                 var pageId = messageId.GetMessageContentPageId();
-                
-                var (myMessage, pageIsLoaded) =
-                    topicQueue.Topic.MessagesContentCache.TryGetMessage(pageId, messageId);
 
-                if (!pageIsLoaded)
+
+                if (messagesPage == null)
                 {
-                    await _messagesPageLoader.LoadPageAsync(topicQueue.Topic, pageId);
-                    (myMessage, _) = topicQueue.Topic.MessagesContentCache.TryGetMessage(pageId, messageId);
+                    messagesPage = await GetMessagesPageAsync(topicQueue, pageId);
+                }
+                else
+                {
+                    if (!messagesPage.PageId.EqualsTo(pageId))
+                        messagesPage = await GetMessagesPageAsync(topicQueue, pageId);
                 }
 
-                if (myMessage == null)
-                {
-                    _log.AddLog(LogLevel.Warning, topicQueue,
-                        $"Message #{messageId} with AttemptNo:{attemptNo} is not found. Skipping it...");
+
+                var messageContent = messagesPage.TryGet(messageId);
+
+                if (messageContent == null)
                     continue;
-                }
 
-                subscriber.AddMessage(myMessage, attemptNo);
-
+                subscriber.EnqueueMessage(messageContent, attemptNo);
 
                 if (subscriber.Session.Disconnected)
                 {
                     _log.AddLog(LogLevel.Warning, topicQueue,
-                        $"Disconnected while we were Filling package with Messages for the Session: {subscriber.Session.SubscriberId}");
+                        $"Disconnected while we were Filling package with Messages for the Session: {subscriber.Session.Id}");
                     return;
                 }
 
@@ -80,8 +105,11 @@ namespace MyServiceBus.Domains.Execution
             {
                 if (leasedSubscriber.MessagesSize > 0)
                 {
-                    topicQueue.CancelDelivery(leasedSubscriber);
+                    leasedSubscriber.TopicQueue.EnqueueMessages(leasedSubscriber.MessagesOnDelivery.Select(itm => itm.message.MessageId));
+                    leasedSubscriber.Reset();
                 }
+    
+                
                 _log.AddLog(LogLevel.Error, topicQueue, ex.Message);
                 Console.WriteLine(ex);
             }
@@ -96,5 +124,6 @@ namespace MyServiceBus.Domains.Execution
             foreach (var topicQueue in topic.GetQueues())
                 await SendMessagesAsync(topicQueue);
         }
+
     }
 }

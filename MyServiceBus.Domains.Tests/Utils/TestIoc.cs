@@ -5,6 +5,7 @@ using MyServiceBus.Domains.Execution;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
 using MyServiceBus.Domains.Queues;
+using MyServiceBus.Domains.QueueSubscribers;
 using MyServiceBus.Domains.Tests.GrpcMocks;
 using MyServiceBus.Domains.Topics;
 using MyServiceBus.Persistence.Grpc;
@@ -64,15 +65,7 @@ namespace MyServiceBus.Domains.Tests.Utils
             return (int)topic.GetQueueMessagesCount(queueId);
         }
         
-        public static int GetLeasedMessagesCount(this IServiceProvider ioc, string topicId, string queueId)
-        {
-            var topic = ioc.GetRequiredService<TopicsList>().Get(topicId);
-            var queue = topic.GetQueue(queueId);
-            return queue.GetLeasedMessagesCount();
-        }
-
-
-        public static MessagesPageInMemory GetMessagesFromPersistentStorage(this IServiceProvider ioc, string topicId)
+        public static MessagesPage GetMessagesFromPersistentStorage(this IServiceProvider ioc, string topicId)
         {
             var persistentStorage = ioc.GetRequiredService<IMyServiceBusMessagesPersistenceGrpcService>();
             var messagesPageId = new MessagesPageId(0);

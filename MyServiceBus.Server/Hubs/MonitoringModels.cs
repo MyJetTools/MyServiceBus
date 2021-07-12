@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using MyServiceBus.Abstractions.QueueIndex;
 using MyServiceBus.Domains.Queues;
+using MyServiceBus.Domains.QueueSubscribers;
+using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
-using MyServiceBus.Server.Models;
 using MyServiceBus.Server.Tcp;
 
 namespace MyServiceBus.Server.Hubs
@@ -80,7 +81,7 @@ namespace MyServiceBus.Server.Hubs
                 var queueType = (int)topicQueue.TopicQueueType;
                 var messagesCount = topicQueue.GetMessagesCount();
                 var ready = topicQueue.GetReadyQueueSnapshot().Select(QueueSliceHubModel.Create);
-                var leased = topicQueue.GetLeasedMessagesCount();
+                var leased = topicQueue.Metrics.MessagesOnDeliveryAmount;
                 return new ()
                 {
                     Id = topicQueue.QueueId,
@@ -115,27 +116,28 @@ namespace MyServiceBus.Server.Hubs
         }
     }
 
-    public class TcpConnectionSubscribeHubModel
+    public class SessionSubscriberHubModel
     {
         public string TopicId { get; set; }
         public string QueueId { get; set; }
         public int Light { get; set; }
         public IEnumerable<QueueSliceHubModel> Leased { get; set; }
 
-        public static TcpConnectionSubscribeHubModel Create(TopicQueue topicQueue, MyServiceBusTcpContext tcpContext)
+        public static SessionSubscriberHubModel Create(QueueSubscriber subscriber)
         {
             return new ()
             {
-                TopicId = topicQueue.Topic.TopicId,
-                QueueId = topicQueue.QueueId,
-                Leased = topicQueue.GetLeasedQueueSnapshot(tcpContext).Select(QueueSliceHubModel.Create),
-                Light = DateTime.UtcNow - tcpContext.SessionContext.SubscriberInfo.GetSubscriberLastPacketDateTime(topicQueue.Topic.TopicId, topicQueue.QueueId) < TopicConnectionHubModel.TwoSeconds ? 1 : 0
+                TopicId = subscriber.TopicQueue.Topic.TopicId,
+                QueueId = subscriber.TopicQueue.QueueId,
+                Leased = subscriber.GetOnDeliveryIntervals().GetSnapshot().Select(QueueSliceHubModel.Create),
+                Light = DateTime.UtcNow - subscriber.OnDeliveryStart < TopicConnectionHubModel.TwoSeconds ? 1 : 0
             };
         }
     }
 
-    public class TcpConnectionHubModel
+    public class ConnectionHubModel
     {
+        public string Type { get; set; }
         public string Id { get; set; }
         public string Name { get; set; }
         public string Ip { get; set; }
@@ -144,12 +146,16 @@ namespace MyServiceBus.Server.Hubs
         public long ReadBytes { get; set; }
         public long SentBytes { get; set; }
         
-        public int DeliveryEventsPerSecond { get; set; }
+        public int PublishMessagesPerSecond { get; set; }
+        public int PublishPayloadsPerSecond { get; set; }
+        
+        public int DeliveryMessagesPerSecond { get; set; }
+        public int DeliveryPayloadsPerSecond { get; set; }
         public int ProtocolVersion { get; set; }
         
         public IEnumerable<TopicConnectionHubModel> Topics { get; set; }
         
-        public IEnumerable<TcpConnectionSubscribeHubModel> Queues { get; set; }
+        public IEnumerable<SessionSubscriberHubModel> Queues { get; set; }
     }
     
 
@@ -170,8 +176,8 @@ namespace MyServiceBus.Server.Hubs
                 Id = topic.TopicId,
                 Pages = topic.MessagesContentCache.GetPages().Select(itm =>
                     TopicPageModel.Create(itm.no + ":" + itm.size.ByteSizeToString(), itm.percent)),
-                MsgPerSec = topic.MessagesPerSecond,
-                ReqPerSec = topic.RequestsPerSecond,
+                MsgPerSec = topic.Metrics.PublishedMessagesPerSecond.Value,
+                ReqPerSec = topic.Metrics.PublishPayloadsPerSecond.Value,
                 Queues = topic.GetQueues().Select(TopicQueueHubModel.Create).Where(itm => itm != null)
             };
 

@@ -1,34 +1,18 @@
-using System;
 using MyServiceBus.Domains.Sessions;
 
 namespace MyServiceBus.Server.Services.Sessions
 {
     public class GrpcSession
     {
-        
-        public DateTime Created { get; } = DateTime.UtcNow;
-        
-        public DateTime LastAccess { get; private set; } = DateTime.UtcNow;
+        public MyServiceBusSession Session { get; }
 
-        internal void UpdateLastAccess(DateTime utcNow)
+        public GrpcSession(long id, MyServiceBusSession session)
         {
-            LastAccess = utcNow;
-        }
-        
-        public GrpcSession(long id, string name, string clientVersion)
-        {
+            Session = session;
             Id = id;
-            Name = name;
-            ClientVersion = clientVersion;
         }
+
         public long Id { get; }
-
-        public MyServiceBusSessionContext SessionContext = new ();
-        
-        public string Name { get; }
-        
-        public string ClientVersion { get; }
-
     }
     
     

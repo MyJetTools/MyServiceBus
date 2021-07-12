@@ -1,19 +1,20 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
 using MyServiceBus.Domains.Metrics;
 using MyServiceBus.Domains.Persistence;
 using MyServiceBus.Domains.QueueSubscribers;
 using MyServiceBus.Domains.Topics;
-using MyServiceBus.Persistence.Grpc;
 
 namespace MyServiceBus.Domains.Queues
 {
 
+
+
+    
+    
     public class TopicQueue 
     {
         private class ExecutionMonitoring
@@ -38,22 +39,23 @@ namespace MyServiceBus.Domains.Queues
                 HadException = false;
             }
         }
-
-        
         public MyTopic Topic { get; }
         public string QueueId { get; }
         public TopicQueueType TopicQueueType { get; private set; }
         
         private readonly QueueWithIntervals _queue;
 
-        private readonly object _topicLock = new();
+        private readonly object _queueLock = new();
 
         private readonly Dictionary<long, int> _attempts = new();
 
-        private readonly MetricList<int> _executionDuration = new ();
+        private readonly MetricHistory<int> _executionDuration = new ();
 
         private readonly ExecutionMonitoring _executionMonitoring = new ();
+
         
+        public TopicQueueMetrics Metrics { get; } = new ();
+
         public QueueSubscribersList SubscribersList { get; }
 
         public TopicQueue(MyTopic topic, string queueId, TopicQueueType topicQueueType, IEnumerable<IQueueIndexRange> ranges)
@@ -62,7 +64,7 @@ namespace MyServiceBus.Domains.Queues
             QueueId = queueId;
             TopicQueueType = topicQueueType;
             _queue = new QueueWithIntervals(ranges);
-            SubscribersList = new QueueSubscribersList(this, _topicLock);
+            SubscribersList = new QueueSubscribersList(this);
         }
 
         public TopicQueue(MyTopic topic, string queueId, TopicQueueType topicQueueType, long messageId)
@@ -71,31 +73,21 @@ namespace MyServiceBus.Domains.Queues
             QueueId = queueId;
             TopicQueueType = topicQueueType;
             _queue = new QueueWithIntervals(messageId);
-            SubscribersList = new QueueSubscribersList(this, _topicLock);
+            SubscribersList = new QueueSubscribersList(this);
         }
 
 
         public IReadOnlyList<IQueueIndexRange> GetReadyQueueSnapshot()
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 return _queue.GetSnapshot();
             }
         }
 
-        public IReadOnlyList<IQueueIndexRange> GetLeasedQueueSnapshot(IMyServiceBusSubscriberSession session)
-        {
-            lock (_topicLock)
-            {
-                var subscriber = SubscribersList.TryGetSubscriber(session);
-                return subscriber == null ? Array.Empty<IQueueIndexRange>() : subscriber.LeasedQueue.GetSnapshot();
-            }
-        }
-        
-
         public IEnumerable<(long messageId, int attemptNo)> DequeNextMessage()
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 var result = _queue.Dequeue();
 
@@ -117,47 +109,48 @@ namespace MyServiceBus.Domains.Queues
             TopicQueueType = topicQueueType;
         }
 
-        private void DisposeNotDeliveredMessages(
-            IEnumerable<(MessageContentGrpcModel message, int attemptNo)> messages, int incrementAttemptNo)
-        {
-            foreach (var (message, attemptNo) in messages)
-            {
-                // Make it not through Message By Messages - but though merge of to IntervalQueues to increase performance
-                _queue.Enqueue(message.MessageId);
 
-                if (!_attempts.TryAdd(message.MessageId, attemptNo))
-                    _attempts[message.MessageId] = attemptNo + incrementAttemptNo;
+        private void AddAttempt(long messageId)
+        {
+            if (!_attempts.TryAdd(messageId, 1))
+                _attempts[messageId] += 1;
+        }
+
+     
+
+        public void EnqueueMessages(IEnumerable<long> messages)
+        {
+            lock (_queueLock)
+            {
+                foreach (var messageId in messages)
+                    _queue.Enqueue(messageId);       
+            }
+        }
+        
+        public void EnqueueMessagesBack(IEnumerable<long> messages)
+        {
+            lock (_queueLock)
+            {
+                foreach (var messageId in messages)
+                {
+                    _queue.Enqueue(messageId);
+                    AddAttempt(messageId);
+                }
+            }
+        }
+        
+        public void ConfirmDelivered(IEnumerable<long> messages)
+        {
+            lock (_queueLock)
+            {
+                foreach (var messageId in messages)
+                    _attempts.Remove(messageId);
             }
         }
 
 
-        public void CancelDelivery(TheQueueSubscriber leasedSubscriber)
-        {
-            lock (_topicLock)
-            {
-                DisposeNotDeliveredMessages(leasedSubscriber.MessagesCollector, 0);
-                leasedSubscriber.SetToUnLeased();
-            }
-        }
 
-        public void EnqueueMessages(IEnumerable<MessageContentGrpcModel> messages)
-        {
-            lock (_topicLock)
-            {
-                foreach (var message in messages)
-                    _queue.Enqueue(message.MessageId);       
-            }
-        }
-
-        public void EnqueueMessage(MessageContentGrpcModel message)
-        {
-            lock (_topicLock)
-            {
-                _queue.Enqueue(message.MessageId);
-            }
-        }
-
-
+        /*
         public void ConfirmDelivery(TheQueueSubscriber subscriber, TimeSpan executionDuration)
         {
             lock (_topicLock)
@@ -166,10 +159,11 @@ namespace MyServiceBus.Domains.Queues
                 subscriber.SetToUnLeased(); 
             }
         }
+
         
         public void ConfirmSomeDelivered(TheQueueSubscriber subscriber, TimeSpan executionDuration, QueueWithIntervals okDelivered)
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 _executionMonitoring.UpdateLastAmount(subscriber.MessagesOnDelivery.Count, executionDuration, true);
 
@@ -207,10 +201,18 @@ namespace MyServiceBus.Domains.Queues
                 subscriber.SetToUnLeased();
             }
         }
+*/
 
+        public void SetMinimalMessageId(long minMessageId, long maxMessageId)
+        {
+            lock (_queueLock)
+            {
+                _queue.SetMinMessageId(minMessageId, maxMessageId);
+            }
+        }
         public long GetMessagesCount()
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 return _queue.Count;
             }
@@ -218,7 +220,7 @@ namespace MyServiceBus.Domains.Queues
 
         public IQueueSnapshot GetSnapshot()
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 return new QueueSnapshot
                 {
@@ -229,21 +231,16 @@ namespace MyServiceBus.Domains.Queues
             }
         }
 
-        public long GetMinId()
+        public long GetMinMessageId()
         {
-            lock (_topicLock)
+            lock (_queueLock)
             {
-                var minFromLeasedQueue = this.GetMinMessageId();
-                var minFromQueue = _queue.GetMinId();
-                
-                if (minFromLeasedQueue<0)
-                    return _queue.GetMinId();
-
-                return minFromQueue < minFromLeasedQueue ? minFromQueue : minFromLeasedQueue;
+                return _queue.GetMinId();
             }
         }
 
 
+        /*
         public async ValueTask<bool> DisconnectedAsync(IMyServiceBusSubscriberSession session)
         {
             
@@ -269,6 +266,7 @@ namespace MyServiceBus.Domains.Queues
             }
 
         }
+        */
 
         public override string ToString()
         {
@@ -276,7 +274,7 @@ namespace MyServiceBus.Domains.Queues
             var result = new StringBuilder();
 
 
-            lock (_topicLock)
+            lock (_queueLock)
             {
                 result.Append("Queue:[");
                 if (_queue.Count == 0)
@@ -297,6 +295,7 @@ namespace MyServiceBus.Domains.Queues
 
         }
 
+        /*
         public void SetInterval(long minId, long maxId)
         {
             lock (_topicLock)
@@ -310,7 +309,7 @@ namespace MyServiceBus.Domains.Queues
                 _queue.SetMinMessageId(minId, maxId);
             }
         }
-
+*/
 
         public long GetExecutionDurationSnapshotId()
         {
@@ -328,10 +327,10 @@ namespace MyServiceBus.Domains.Queues
             }
         }
 
-        public void KickMetricsTimer()
+        public void OneSecondTimer()
         {
             
-            SubscribersList.OneSecondTimer();
+            //SubscribersList.OneSecondTimer();
             
             lock (_executionDuration)
             {
@@ -347,6 +346,7 @@ namespace MyServiceBus.Domains.Queues
                 _executionMonitoring.Reset();
             }
         }
+
 
     }
 }

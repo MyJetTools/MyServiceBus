@@ -7,13 +7,6 @@ namespace MyServiceBus.Server.Controllers
 {
     public class MessagesController : Controller
     {
-        private readonly MyServiceBusSubscriber _myServiceBusSubscriber;
-
-        public MessagesController(MyServiceBusSubscriber myServiceBusSubscriber)
-        {
-            _myServiceBusSubscriber = myServiceBusSubscriber;
-        }
-        
         
         [HttpPost("Messages/ReplayMessage")]
         public async ValueTask<IActionResult> ReplayMessage([FromQuery][Required]string topicId, 
@@ -30,7 +23,7 @@ namespace MyServiceBus.Server.Controllers
             if (queue == null)
                 return Conflict($"Queue {topicId}/{queueId} is not found");
 
-            var result = await _myServiceBusSubscriber.ReplayMessageAsync(queue, messageId);
+            var result = await ServiceLocator.SubscriberOperations.ReplayMessageAsync(queue, messageId);
 
             
             if (result == ReplayMessageResult.MessageNotFound)

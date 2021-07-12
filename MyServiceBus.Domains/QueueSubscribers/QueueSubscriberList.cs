@@ -3,75 +3,78 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MyServiceBus.Domains.Queues;
+using MyServiceBus.Domains.Sessions;
 
 namespace MyServiceBus.Domains.QueueSubscribers
 {
 
-    public interface IReadSubscribersAccess
-    {
-        IEnumerable<TheQueueSubscriber> GetSubscribers();
-        IEnumerable<TheQueueSubscriber> GetExceptThisOne(IMyServiceBusSubscriberSession subscriberSession);
-    }
 
-    public class QueueSubscribersList : IReadSubscribersAccess
+    public class QueueSubscribersList
     {
         private readonly TopicQueue _topicQueue;
         
-        private readonly Dictionary<string, TheQueueSubscriber> _subscribers 
+        private readonly Dictionary<string, QueueSubscriber> _subscribers 
             = new ();
         
-        private readonly Dictionary<long, TheQueueSubscriber> _subscribersByDeliveryId 
+        private readonly Dictionary<long, QueueSubscriber> _subscribersByDeliveryId 
             = new ();
 
-        private IReadOnlyList<TheQueueSubscriber> _subscribersAsList = Array.Empty<TheQueueSubscriber>();
+        private IReadOnlyList<QueueSubscriber> _subscribersAsList = Array.Empty<QueueSubscriber>();
 
 
-        private readonly object _lockObject;
+        private readonly object _lockObject = new ();
 
-        public QueueSubscribersList(TopicQueue topicQueue, object lockObject)
+        public QueueSubscribersList(TopicQueue topicQueue)
         {
             _topicQueue = topicQueue;
-            _lockObject = lockObject;
         }
 
-        public void Subscribe(IMyServiceBusSubscriberSession session)
+        public QueueSubscriber Subscribe(MyServiceBusSession session)
         {
             lock (_lockObject)
             {
-                if (_subscribers.ContainsKey(session.SubscriberId))
+                if (_subscribers.ContainsKey(session.Id))
                     throw new Exception($"Subscriber to topic: {_topicQueue.Topic}  and queue: {_topicQueue.QueueId} is already exists");
 
-                var theSubscriber = new TheQueueSubscriber(session, _topicQueue);
+                var theSubscriber = new QueueSubscriber(session, _topicQueue);
                 
-                _subscribers.Add(session.SubscriberId, theSubscriber);
+                _subscribers.Add(session.Id, theSubscriber);
                 _subscribersByDeliveryId.Add(theSubscriber.ConfirmationId, theSubscriber);
                 _subscribersAsList = _subscribers.Values.ToList();
+
+                return theSubscriber;
             }
         }
 
-        public TheQueueSubscriber Unsubscribe(IMyServiceBusSubscriberSession session)
+
+        private QueueSubscriber Unsubscribe(string sessionId)
+        {
+            if (_subscribers.Remove(sessionId, out var removedItem))
+            {
+                _subscribersByDeliveryId.Remove(removedItem.ConfirmationId);
+                _subscribersAsList = _subscribers.Values.ToList();
+                return removedItem;
+            }
+
+            return null;
+        }
+        
+        public QueueSubscriber Unsubscribe(MyServiceBusSession session)
         {
             lock (_lockObject)
             {
-                if (_subscribers.Remove(session.SubscriberId, out var removedItem))
-                {
-                    _subscribersByDeliveryId.Remove(removedItem.ConfirmationId);
-                    return removedItem;
-                }
-
-                _subscribersAsList = _subscribers.Values.ToList();
-                return null;
+                return Unsubscribe(session.Id);
             }
         }
 
-        public TheQueueSubscriber LeaseSubscriber()
+        public QueueSubscriber LeaseSubscriber()
         {
             lock (_lockObject)
             {
                 var readyToBeLeased
                     = _subscribers
                         .Values
-                        .FirstOrDefault(itm => itm.Status == SubscriberStatus.UnLeased);
+                        .FirstOrDefault(itm => itm.Status == SubscriberStatus.Ready);
 
                 if (readyToBeLeased == null)
                     return null;
@@ -82,28 +85,28 @@ namespace MyServiceBus.Domains.QueueSubscribers
             }
         }
 
-        public void UnLease(TheQueueSubscriber subscriber)
+        public void UnLease(QueueSubscriber subscriber)
         {
             lock (_lockObject)
             {
                 if (subscriber.MessagesSize > 0)
                     subscriber.SetOnDeliveryAndSendMessages();
                 else
-                    subscriber.SetToUnLeased();
+                    subscriber.Reset();
             }
         }
 
-        public TheQueueSubscriber TryGetSubscriber(IMyServiceBusSubscriberSession session)
+        public QueueSubscriber TryGetSubscriber(MyServiceBusSession session)
         {
             lock (_lockObject)
             {
-                return _subscribers.TryGetValue(session.SubscriberId, out var subscriber) 
+                return _subscribers.TryGetValue(session.Id, out var subscriber) 
                     ? subscriber 
                     : null;
             }
         }
 
-        public TheQueueSubscriber TryGetSubscriber(long confirmationId)
+        public QueueSubscriber TryGetSubscriber(long confirmationId)
         {
             lock (_lockObject)
             {
@@ -121,22 +124,6 @@ namespace MyServiceBus.Domains.QueueSubscribers
                 return _subscribers.Count;
             }
         }
-        
-        public void GetReadAccess(Action<IReadSubscribersAccess> callback)
-        {
-            lock (_lockObject)
-            {
-                callback(this);
-            }   
-        }
-
-        public T GetReadAccess<T>(Func<IReadSubscribersAccess, T> callback)
-        {
-            lock (_lockObject)
-            {
-                return callback(this);
-            }   
-        }
 
 
         public void OneSecondTimer()
@@ -146,15 +133,26 @@ namespace MyServiceBus.Domains.QueueSubscribers
         }
 
 
-        IEnumerable<TheQueueSubscriber> IReadSubscribersAccess.GetSubscribers()
+        public IReadOnlyList<QueueSubscriber> GetSubscribers()
         {
-            return _subscribers.Values;
+            return _subscribersAsList;
         }
 
-        IEnumerable<TheQueueSubscriber> IReadSubscribersAccess.GetExceptThisOne(IMyServiceBusSubscriberSession subscriberSession)
+        public IReadOnlyList<QueueSubscriber> RemoveAllExceptThisOne(QueueSubscriber subscriber)
         {
-            return _subscribers.Values.Where(itm => itm.Session.SubscriberId != subscriberSession.SubscriberId);
+            lock (_lockObject)
+            {
+                var result =  _subscribers.Values.Where(itm => itm.Session.Id != subscriber.Session.Id)
+                    .ToList();
+
+                foreach (var queueSubscriber in result)
+                    Unsubscribe(queueSubscriber.Session.Id);
+
+                return result;
+            }
         }
+        
+        
 
     }
 

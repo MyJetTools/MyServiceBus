@@ -21,9 +21,13 @@ namespace MyServiceBus.Server.Controllers
         }
 
         [HttpPost("Topics/Create")]
-        public async Task<IActionResult> Create([FromForm][Required]string topicId)
+        public async Task<IActionResult> Create([FromForm][Required]long sessionId, [FromForm][Required]string topicId)
         {
-            await ServiceLocator.TopicsManagement.AddIfNotExistsAsync(topicId);
+            var session = ServiceLocator.GrpcSessionsList.TryGetSession(sessionId, DateTime.UtcNow);
+            if (session == null)
+                return Forbid();
+            
+            await ServiceLocator.MyServiceBusPublisherOperations.CreateTopicIfNotExists(session.Session, topicId);
             return Json(GetAll());
         }
 
@@ -41,7 +45,7 @@ namespace MyServiceBus.Server.Controllers
                 MetaData = Array.Empty<MessageContentMetaDataItem>(),
                 Data = bytes
             };
-            var result = await ServiceLocator.MyServiceBusPublisher.PublishAsync(session.SessionContext, topicId, new[] {publishMessage}, DateTime.UtcNow, persistImmediately);
+            var result = await ServiceLocator.MyServiceBusPublisherOperations.PublishAsync(session.Session, topicId, new[] {publishMessage}, DateTime.UtcNow, persistImmediately);
             return Json(new {result});
         }
 

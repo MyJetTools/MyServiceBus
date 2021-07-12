@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -102,7 +103,7 @@ namespace MyServiceBus.Domains.Queues
                 return;
             }
 
-            MinMessageId = _topicQueues.Values.Min(itm => itm.GetMinId());
+            MinMessageId = _topicQueues.Values.Min(itm => itm.GetMinMessageId());
         }
         
         public TopicQueue GetQueue(string queueId)
@@ -113,7 +114,7 @@ namespace MyServiceBus.Domains.Queues
             throw new Exception($"Queue with id {queueId} is not found");
         }
         
-        public TopicQueue TryGetQueue(string queueId)
+        public TopicQueue? TryGetQueue(string queueId)
         {
             return _topicQueues.TryGetValue(queueId, out var result) ? result : null;
         }
@@ -150,9 +151,7 @@ namespace MyServiceBus.Domains.Queues
         public void OneSecondTimer()
         {
             foreach (var topicQueue in _queuesAsReadOnlyList)
-            {
-                topicQueue.KickMetricsTimer();
-            }
+                topicQueue.OneSecondTimer();
         }
     }
 }

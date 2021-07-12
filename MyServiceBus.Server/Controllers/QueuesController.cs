@@ -31,13 +31,18 @@ namespace MyServiceBus.Server.Controllers
             if (topic == null)
                 return Conflict($"Topic {topicId} is not found");
 
-            topic.SetQueueMessageId(queueId, messageId);
+            var topicQueue = topic.TryGetQueue(queueId);
+            
+            if (topicQueue == null)
+                return Conflict($"Topic {topicId} is not found");
+
+            ServiceLocator.SubscriberOperations.ReplayMessageAsync(topicQueue, messageId);
 
             return Content("Ok");
         }
 
         
-        private static TimeSpan TenSeconds = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan TenSeconds = TimeSpan.FromSeconds(10);
         [HttpPost("/Queues/PushMessageAgain")]
         public IActionResult PushMessageAgain([FromQuery] [Required] string topicId, 
             [FromQuery] [Required] string queueId)
@@ -56,19 +61,17 @@ namespace MyServiceBus.Server.Controllers
             var result = new StringBuilder();
 
 
-            queue.SubscribersList.GetReadAccess(readAccess =>
-            {
-                foreach (var subscriber in readAccess.GetSubscribers())
-                {
-                    if (subscriber.Status == SubscriberStatus.OnDelivery &&
-                        DateTime.UtcNow - subscriber.OnDeliveryStart > TenSeconds)
-                    {
-                        subscriber.SendMessages();
 
-                        result.AppendLine("Push message to the subscriber: " + subscriber.Session.SubscriberId);
-                    }
+            foreach (var subscriber in queue.SubscribersList.GetSubscribers())
+            {
+                if (subscriber.Status == SubscriberStatus.OnDelivery &&
+                    DateTime.UtcNow - subscriber.OnDeliveryStart > TenSeconds)
+                {
+                    subscriber.Session.SendMessagesToSubscriber(subscriber);
+
+                    result.AppendLine("Push message to the subscriber: " + subscriber.Session.Id);
                 }
-            });
+            }
 
             return Content(result.ToString());
         }

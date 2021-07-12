@@ -1,9 +1,8 @@
 using System;
 using System.Linq;
+using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Domains.Topics;
 using MyServiceBus.Server.Models;
-using MyServiceBus.Server.Tcp;
-
 
 namespace MyServiceBus.Server.Hubs
 {
@@ -17,22 +16,28 @@ namespace MyServiceBus.Server.Hubs
 
         }
         
-        internal static TcpConnectionHubModel ToTcpConnectionHubModel(this MyServiceBusTcpContext tcpContext)
+        internal static ConnectionHubModel ToTcpConnectionHubModel(this MyServiceBusSession session)
         {
             return new ()
             {
-                Id = tcpContext.Id.ToString(),
-                Name = tcpContext.ContextName,
-                Ip = tcpContext.TcpClient.Client.RemoteEndPoint?.ToString() ?? "unknown",
-                Connected = (DateTime.UtcNow - tcpContext.SocketStatistic.ConnectionTime).FormatTimeStamp(),
-                Recv = (DateTime.UtcNow - tcpContext.SocketStatistic.LastReceiveTime).FormatTimeStamp(),
-                ReadBytes = tcpContext.SocketStatistic.Received,
-                SentBytes = tcpContext.SocketStatistic.Sent,
-                DeliveryEventsPerSecond = tcpContext.SessionContext.MessagesDeliveryMetricPerSecond.Value,
-                ProtocolVersion = tcpContext.ProtocolVersion,
-                Topics =  tcpContext.SessionContext.PublisherInfo.GetTopicsToPublish().Select(TopicConnectionHubModel.Create),
-                Queues = tcpContext.SessionContext.GetQueueSubscribers().Select(queue => TcpConnectionSubscribeHubModel.Create(queue, tcpContext))
+                Id = session.Id,
+                Name = session.Name,
+                Ip = session.Ip,
+                Connected = (DateTime.UtcNow - session.Created).FormatTimeStamp(),
+                Recv = (DateTime.UtcNow - session.Created).FormatTimeStamp(),
+                ReadBytes = session.ReadBytes,
+                SentBytes = session.SentBytes,
+                PublishMessagesPerSecond = session.PublisherInfo.PublishMessagesPerSecond.Value,
+                PublishPayloadsPerSecond = session.PublisherInfo.PublishPayloadsPerSecond.Value,
+                DeliveryMessagesPerSecond = session.Subscribers.DeliveryMessagesPerSecond.Value,
+                DeliveryPayloadsPerSecond = session.Subscribers.DeliveryMessagesPerSecond.Value,
+                
+                ProtocolVersion = session.ProtocolVersion,
+                Topics =  session.PublisherInfo.GetTopicsToPublish().Select(TopicConnectionHubModel.Create),
+                Queues = session.Subscribers.GetAll().Select(itm => SessionSubscriberHubModel.Create(itm.Subscriber))
             };
         }
+
+
     }
 }

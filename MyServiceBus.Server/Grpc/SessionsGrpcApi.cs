@@ -8,11 +8,15 @@ namespace MyServiceBus.Server.Grpc
     {
         public ValueTask<GreetingGrpcResponse> GreetingAsync(GreetingGrpcRequest request)
         {
-            var session = ServiceLocator.GrpcSessionsList.GenerateNewSession(request.Name, request.ClientVersion);
+            var session = ServiceLocator.SessionsList.IssueSession();
+            session.Name = request.Name;
+            session.ClientVersion = request.ClientVersion;
+            
+            var grpcSession = ServiceLocator.GrpcSessionsList.GenerateNewSession(session);
 
             var response = new GreetingGrpcResponse
             {
-                SessionId = session.Id
+                SessionId = grpcSession.Id
             };
 
             return new ValueTask<GreetingGrpcResponse>(response);

@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
 using MyServiceBus.Domains.Execution;
-using MyServiceBus.Domains.Queues;
 using MyServiceBus.Domains.QueueSubscribers;
 using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Persistence.Grpc;
@@ -15,7 +13,7 @@ using MyTcpSockets;
 
 namespace MyServiceBus.Server.Tcp
 {
-    public class MyServiceBusTcpContext : TcpContext<IServiceBusTcpContract>, IMyServiceBusSubscriberSession
+    public class MyServiceBusTcpContext : TcpContext<IServiceBusTcpContract>
     {
 
         public int ProtocolVersion { get; private set; }
@@ -28,12 +26,17 @@ namespace MyServiceBus.Server.Tcp
             if (topic == null)
                 return $"There is a confirmation {confirmationId} for a topic {topicId} which is not found";
 
-            await ServiceLocator.Subscriber.ConfirmDeliveryAsync(topic, queueId, confirmationId, ok);
+            var topicQueue = topic.TryGetQueue(queueId);
+            
+            if (topicQueue == null)
+                return $"There is a confirmation {confirmationId} for a queue {queueId} with topic {topicId} which is not found";
 
+            if (ok)
+                await ServiceLocator.SubscriberOperations.ConfirmDeliveryAsync(topicQueue, confirmationId);
+            else
+                await ServiceLocator.SubscriberOperations.ConfirmNotDeliveryAsync(topicQueue, confirmationId);
             return null;
         }
-
-
 
         private async ValueTask<string> ExecuteConfirmDeliveryOfSomeMessagesByNotCommitContract(
             ConfirmMessagesByNotDeliveryContract packet)
@@ -42,11 +45,19 @@ namespace MyServiceBus.Server.Tcp
 
             if (topic == null)
                 return
-                    $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId}/{packet.QueueId} which is not found";
+                    $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId} which is not found";
 
-            var confirmedMessages = new QueueWithIntervals(packet.ConfirmedMessages);
-            await ServiceLocator.Subscriber.ConfirmMessagesByNotDeliveryAsync(topic, packet.QueueId,
-                packet.ConfirmationId, confirmedMessages);
+            var topicQueue = topic.TryGetQueue(packet.QueueId);
+
+            if (topicQueue == null)
+                return
+                    $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId}/{packet.QueueId} which is not found";
+            
+            var notConfirmedMessages = new QueueWithIntervals(packet.ConfirmedMessages);
+            
+            //ToDo - проверить что не перепутали
+            await ServiceLocator.SubscriberOperations.ConfirmMessagesByConfirmedListAsync(topicQueue,
+                packet.ConfirmationId, notConfirmedMessages);
             return null;
         }
 
@@ -57,16 +68,22 @@ namespace MyServiceBus.Server.Tcp
             if (topic == null)
                 return
                     $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId}/{packet.QueueId} which is not found";
+            
+            var topicQueue = topic.TryGetQueue(packet.QueueId);
 
+            if (topicQueue == null)
+                return
+                    $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId}/{packet.QueueId} which is not found";
+            
             var okMessages = new QueueWithIntervals(packet.OkMessages);
-            await ServiceLocator.Subscriber.ConfirmDeliveryAsync(topic, packet.QueueId, packet.ConfirmationId,
+            
+            await ServiceLocator.SubscriberOperations.ConfirmMessagesByNotConfirmedListAsync(topicQueue, packet.ConfirmationId,
                 okMessages);
             return null;
         }
 
         private async ValueTask<string> PublishAsync(PublishContract contract)
         {
-            SessionContext.PublisherInfo.PublishMetricPerSecond.EventHappened();
 
             var now = DateTime.UtcNow;
 
@@ -74,7 +91,7 @@ namespace MyServiceBus.Server.Tcp
                 { Data = msg, MetaData = Array.Empty<MessageContentMetaDataItem>() });
 
             var response = await ServiceLocator
-                .MyServiceBusPublisher
+                .MyServiceBusPublisherOperations
                 .PublishAsync(SessionContext, contract.TopicId, messages, now, contract.ImmediatePersist == 1);
 
             if (response != ExecutionResult.Ok)
@@ -90,7 +107,13 @@ namespace MyServiceBus.Server.Tcp
             return null;
         }
 
-        public readonly MyServiceBusSessionContext SessionContext =  new ();
+        public readonly MyServiceBusSession SessionContext;
+
+        public MyServiceBusTcpContext()
+        {
+            SessionContext = ServiceLocator.SessionsList.IssueSession();
+            SessionContext.PlugSendMessages(SendMessages);
+        }
 
         private static readonly Dictionary<int, int> AcceptedProtocolVersions = new ()
         {
@@ -137,17 +160,9 @@ namespace MyServiceBus.Server.Tcp
                     $"Client {ContextName} is trying to subscribe to the topic {contract.TopicId} which does not exists";
 
             var queue = topic.CreateQueueIfNotExists(contract.QueueId, contract.QueueType, true);
-            SessionContext.SubscribeToQueue(queue);
-            ServiceLocator.Subscriber.SubscribeToQueueAsync(queue, this);
+        
+            ServiceLocator.SubscriberOperations.SubscribeToQueueAsync(queue, SessionContext);
 
-            if (queue.TopicQueueType == TopicQueueType.PermanentWithSingleConnection)
-            {
-                var subscribersToDisconnect =
-                    queue.SubscribersList.GetReadAccess(readAccess => readAccess.GetExceptThisOne(this).ToList());
-
-                foreach (var subscriber in subscribersToDisconnect)
-                    subscriber.Session.Disconnect();
-            }
 
             return null;
 
@@ -181,7 +196,7 @@ namespace MyServiceBus.Server.Tcp
         {
             ServiceLocator.ConnectionsLog.AddLog(Id, ContextName, GetIp(), "Disconnected");
             ServiceLocator.TcpConnectionsSnapshotId++;
-            return ServiceLocator.Subscriber.DisconnectSubscriberAsync(this);
+            return ServiceLocator.SubscriberOperations.DisconnectSubscriberAsync(SessionContext);
 
         }
 
@@ -271,16 +286,12 @@ namespace MyServiceBus.Server.Tcp
         private void CreateTopicIfNotExists(CreateTopicIfNotExistsContract createTopicIfNotExistsContract)
         {
             ServiceLocator.ConnectionsLog.AddLog(Id, ContextName, GetIp(), $"Attempt to create topic {createTopicIfNotExistsContract.TopicId}");
-
-            SessionContext.PublisherInfo.AddIfNotExists(createTopicIfNotExistsContract.TopicId);
-
-            ServiceLocator.TopicsManagement.AddIfNotExistsAsync(createTopicIfNotExistsContract.TopicId);
+            ServiceLocator.MyServiceBusPublisherOperations.CreateTopicIfNotExists(SessionContext, createTopicIfNotExistsContract.TopicId);
         }
 
-        public void SendMessagesAsync(TopicQueue topicQueue,
-            IReadOnlyList<(MessageContentGrpcModel message, int attemptNo)> messages, long confirmationId)
+        public void SendMessages(QueueSubscriber subscriber)
         {
-            var messageData = messages.Select(
+            var messageData = subscriber.MessagesOnDelivery.Select(
                 msg => new NewMessagesContract.NewMessageData
             {
                 Id = msg.message.MessageId,
@@ -290,30 +301,14 @@ namespace MyServiceBus.Server.Tcp
 
             var contract = new NewMessagesContract
             {
-                TopicId = topicQueue.Topic.TopicId,
-                QueueId = topicQueue.QueueId,
-                ConfirmationId = confirmationId,
+                TopicId = subscriber.TopicQueue.Topic.TopicId,
+                QueueId = subscriber.TopicQueue.QueueId,
+                ConfirmationId = subscriber.ConfirmationId,
                 Data = messageData,
             };
 
-            SessionContext.DeliveringToQueue(topicQueue);
             SendDataToSocket(contract);
         }
 
-        private string _subscriberId;
-        public string SubscriberId
-        {
-            get
-            {
-                if (_subscriberId != null)
-                    return _subscriberId;
-
-                _subscriberId = Id.ToString();
-
-                return _subscriberId;
-            }
-        }
-
-        public bool Disconnected => !Connected;
     }
 }

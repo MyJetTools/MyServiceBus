@@ -10,9 +10,9 @@ namespace MyServiceBus.Domains.MessagesContent
 
         
 
-        public static async ValueTask<MessagesPageInMemory> ToPageInMemoryAsync(this IAsyncEnumerable<MessageContentGrpcModel> pageMessagesAsync, MessagesPageId pageId)
+        public static async ValueTask<MessagesPage> ToPageInMemoryAsync(this IAsyncEnumerable<MessageContentGrpcModel> pageMessagesAsync, MessagesPageId pageId)
         {
-            var result = new MessagesPageInMemory(pageId);
+            var result = new MessagesPage(pageId);
 
             await foreach (var grpcMessage in pageMessagesAsync)
             {

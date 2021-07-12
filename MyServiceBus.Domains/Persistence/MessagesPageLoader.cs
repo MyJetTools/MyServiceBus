@@ -14,47 +14,44 @@ namespace MyServiceBus.Domains.Persistence
         {
             _messagesPersistenceGrpcService = messagesPersistenceGrpcService;
         }
-        
-        
-        public async Task LoadPageAsync(MyTopic topic, MessagesPageId pageId)
+
+
+        public async Task<MessagesPage> LoadPageAsync(MyTopic topic, MessagesPageId pageId)
         {
-            using (await topic.MessagesPersistenceLock.LockAsync())
+
+            var attemptNo = 0;
+
+            while (true)
             {
-                var attemptNo = 0;
-
-                while (true)
+                if (attemptNo >= 5)
                 {
-                    if (attemptNo >= 5)
-                    {
-                        var emptyPage = new MessagesPageInMemory(pageId);
-                        topic.MessagesContentCache.UploadPage(emptyPage);
-                        return;
-                    }
-
-                    try
-                    {
-                        Console.WriteLine($"Trying to restore page {pageId.Value} for topic {topic.TopicId}");
-
-                        var page =
-                            await _messagesPersistenceGrpcService.GetPageAsync(topic.TopicId, pageId.Value)
-                                .ToPageInMemoryAsync(pageId);
-
-                        topic.MessagesContentCache.UploadPage(page);
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(
-                            $"Count not load page {pageId} for topic {topic.TopicId}. Attempt: {attemptNo}. Message: " +
-                            e.Message);
-
-                        await Task.Delay(200);
-                        attemptNo++;
-                    }
-
+                    var emptyPage = new MessagesPage(pageId);
+                    topic.MessagesContentCache.UploadPage(emptyPage);
+                    return emptyPage;
                 }
-            }
 
+                try
+                {
+                    Console.WriteLine($"Trying to restore page {pageId.Value} for topic {topic.TopicId}");
+
+                    var page =
+                        await _messagesPersistenceGrpcService.GetPageAsync(topic.TopicId, pageId.Value)
+                            .ToPageInMemoryAsync(pageId);
+
+                    topic.MessagesContentCache.UploadPage(page);
+                    return page;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(
+                        $"Count not load page {pageId} for topic {topic.TopicId}. Attempt: {attemptNo}. Message: " +
+                        e.Message);
+
+                    await Task.Delay(200);
+                    attemptNo++;
+                }
+
+            }
         }
     }
 }

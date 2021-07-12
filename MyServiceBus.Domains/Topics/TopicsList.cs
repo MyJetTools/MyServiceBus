@@ -7,16 +7,10 @@ namespace MyServiceBus.Domains.Topics
 {
     public class TopicsList
     {
-        private readonly IMetricCollector _metricCollector;
         
         private readonly ConcurrentDictionaryWithNoLocksOnRead<string, MyTopic> _topics = new ();
 
         public int SnapshotId => _topics.SnapshotId;
-
-        public TopicsList(IMetricCollector metricCollector)
-        {
-            _metricCollector = metricCollector;
-        }
 
         public IReadOnlyList<MyTopic> Get()
         {
@@ -40,7 +34,7 @@ namespace MyServiceBus.Domains.Topics
 
         private MyTopic AddNewTopic(string topicId,  long startMessageId)
         {
-            return _topics.Add(topicId, () => new MyTopic(topicId, startMessageId, _metricCollector));
+            return _topics.Add(topicId, () => new MyTopic(topicId, startMessageId));
         }
 
         public MyTopic AddIfNotExists(string topicId)
@@ -49,10 +43,10 @@ namespace MyServiceBus.Domains.Topics
             return AddNewTopic(topicId, 0);
         }
 
-        public void KickMetricsTimer()
+        public void OenSecondTimer()
         {
             foreach (var topic in _topics.GetAllValues())
-                topic.KickMetricsTimer();
+                topic.OenSecondTimer();
         }
 
         public void Restore(IEnumerable<ITopicPersistence> topics)
@@ -61,7 +55,7 @@ namespace MyServiceBus.Domains.Topics
             var newTopics = topics.Select(topicPersistence =>
             {        
                 Console.WriteLine("Restoring topic: " + topicPersistence.TopicId);
-                var newTopic =  new MyTopic(topicPersistence.TopicId, topicPersistence.MessageId, _metricCollector);
+                var newTopic =  new MyTopic(topicPersistence.TopicId, topicPersistence.MessageId);
                 newTopic.Init(topicPersistence.QueueSnapshots);
                 return newTopic;
             });

@@ -15,12 +15,12 @@ namespace MyServiceBus.Domains.MessagesContent
     
         public long Value { get; set; }
 
-        public bool Equals(long pageId)
+        public bool EqualsTo(long pageId)
         {
             return Value == pageId;
         }
         
-        public bool Equals(MessagesPageId pageId)
+        public bool EqualsTo(MessagesPageId pageId)
         {
             return Value == pageId.Value;
         }
@@ -36,7 +36,7 @@ namespace MyServiceBus.Domains.MessagesContent
         }
     }
     
-    public class MessagesPageInMemory
+    public class MessagesPage
     {
 
         private readonly Dictionary<long, MessageContentGrpcModel> _messages;
@@ -45,7 +45,7 @@ namespace MyServiceBus.Domains.MessagesContent
         
         public DateTime Created { get; } = DateTime.UtcNow;
 
-        public MessagesPageInMemory(MessagesPageId pageId)
+        public MessagesPage(MessagesPageId pageId)
         {
             PageId = pageId;
             _messages = new Dictionary<long, MessageContentGrpcModel>();

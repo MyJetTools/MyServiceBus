@@ -2,8 +2,8 @@ namespace MyServiceBus.Abstractions.QueueIndex
 {
     public class QueueIndexRangeReadOnly : IQueueIndexRange
     {
-        public long FromId { get; private set; }
-        public long ToId { get; private set; }
+        public long FromId { get; }
+        public long ToId { get; }
 
         public QueueIndexRangeReadOnly(long fromId, long toId)
         {

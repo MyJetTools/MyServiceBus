@@ -10,7 +10,7 @@ namespace MyServiceBus.Domains.MessagesContent
 
     public class MessagesContentCache
     {
-        private readonly Dictionary<long, MessagesPageInMemory> _messages = new ();
+        private readonly Dictionary<long, MessagesPage> _messages = new ();
         private readonly string _topicId;
 
         private readonly ReaderWriterLockSlim _lockSlim = new ();
@@ -37,7 +37,7 @@ namespace MyServiceBus.Domains.MessagesContent
 
         }
 
-        private MessagesPageInMemory TryGetPage(long no)
+        private MessagesPage TryGetPage(long no)
         {
             _lockSlim.EnterReadLock();
             try
@@ -67,7 +67,7 @@ namespace MyServiceBus.Domains.MessagesContent
                 {
                     var pageId = message.GetMessageContentPageId();
 
-                    var (page, created) = _messages.GetOrCreate(pageId.Value, () => new MessagesPageInMemory(pageId));
+                    var (page, created) = _messages.GetOrCreate(pageId.Value, () => new MessagesPage(pageId));
 
 
                     if (created)
@@ -99,7 +99,7 @@ namespace MyServiceBus.Domains.MessagesContent
             }
         }
 
-        public void UploadPage(MessagesPageInMemory page)
+        public void UploadPage(MessagesPage page)
         {
             _lockSlim.EnterWriteLock();
             try
@@ -170,6 +170,23 @@ namespace MyServiceBus.Domains.MessagesContent
                 _lockSlim.ExitWriteLock();
             }
 
+        }
+
+
+        public MessagesPage TryGetPage(MessagesPageId pageId)
+        {
+            _lockSlim.EnterReadLock();
+            try
+            {
+
+                return _messages.TryGetValue(pageId.Value, out var result)
+                    ? result
+                    : null;
+            }
+            finally
+            {
+                _lockSlim.ExitReadLock();
+            }
         }
 
         public (MessageContentGrpcModel message, bool pageIsLoaded) TryGetMessage(MessagesPageId pageId, long messageId)

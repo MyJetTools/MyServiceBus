@@ -1,58 +1,52 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using MyServiceBus.Abstractions.QueueIndex;
 using MyServiceBus.Domains.Queues;
+using MyServiceBus.Domains.Sessions;
 using MyServiceBus.Persistence.Grpc;
 
 namespace MyServiceBus.Domains.QueueSubscribers
 {
     public enum SubscriberStatus{
-        UnLeased, Leased, OnDelivery
+        Ready, Leased, OnDelivery
     }
 
-    public class TheQueueSubscriber
+    public class QueueSubscriber
     {
         private static long _nextConfirmationId;
         public long ConfirmationId { get; }
         
-        private readonly TopicQueue _topicQueue;
+        public TopicQueue TopicQueue { get;  }
 
         public readonly MetricPerSecond DeliveryEventsPerSecond = new ();
 
-        public TheQueueSubscriber(IMyServiceBusSubscriberSession session, TopicQueue topicQueue)
+        public QueueSubscriber(MyServiceBusSession session, TopicQueue topicQueue)
         {
             _nextConfirmationId++;
             ConfirmationId = _nextConfirmationId;
             Session = session;
-            _topicQueue = topicQueue;
+            TopicQueue = topicQueue;
         }
 
-        public IMyServiceBusSubscriberSession Session { get; }
+        public MyServiceBusSession Session { get; }
 
         public readonly QueueWithIntervals LeasedQueue = new ();
 
         public IReadOnlyList<(MessageContentGrpcModel message, int attemptNo)> MessagesOnDelivery { get; private set; }
         public DateTime OnDeliveryStart { get; private set; }
 
-        public void SendMessages()
-        {
-            OnDeliveryStart = DateTime.UtcNow;
-            Session.SendMessagesAsync(_topicQueue, MessagesOnDelivery, ConfirmationId);
-        }
-        
         internal void SetOnDeliveryAndSendMessages()
         {
             if (Status != SubscriberStatus.Leased)
                 throw new Exception($"Only leased status can be switched to - on Deliver. Now status is: {Status}");
             MessagesOnDelivery = MessagesCollector;
             Status = SubscriberStatus.OnDelivery;
-            SendMessages();
+            //SendMessages();
         }
 
         public List<(MessageContentGrpcModel message, int attemptNo)> MessagesCollector { get; private set; }
         
-        public void AddMessage(MessageContentGrpcModel messageContent, int attemptNo)
+        public void EnqueueMessage(MessageContentGrpcModel messageContent, int attemptNo)
         {
             if (Status != SubscriberStatus.Leased)
                 throw new Exception($"Can not add message when Status is: {Status}. Status must Be Leased");
@@ -64,17 +58,23 @@ namespace MyServiceBus.Domains.QueueSubscribers
         
         public void SetToLeased()
         {
-            if (Status != SubscriberStatus.UnLeased)
+            if (Status != SubscriberStatus.Ready)
                 throw new Exception($"Can not change message to status Leased from Status: {Status}.");
 
             MessagesCollector = new List<(MessageContentGrpcModel message, int attemptNo)>();
 
             Status = SubscriberStatus.Leased;
         }
-        public void SetToUnLeased()
+        public void SwitchToUnLeased()
         {
             ClearMessages();
-            Status = SubscriberStatus.UnLeased;
+            Status = SubscriberStatus.Ready;
+        }
+        
+        public void Reset()
+        {
+            ClearMessages();
+            Status = SubscriberStatus.Ready;
         }
 
 
@@ -95,18 +95,21 @@ namespace MyServiceBus.Domains.QueueSubscribers
             DeliveryEventsPerSecond.OneSecondTimer();
         }
 
-        public void ConfirmedMessagesAsDelivered(QueueWithIntervals confirmedMessages)
-        {
-            var result = MessagesOnDelivery.ToDictionary(itm => itm.message.MessageId);
 
-            foreach (var messageId in confirmedMessages)
+        public QueueWithIntervals GetOnDeliveryIntervals()
+        {
+            var onDelivery = MessagesOnDelivery;
+
+            var result = new QueueWithIntervals();
+
+            foreach (var (message, attempt) in onDelivery)
             {
-                result.Remove(messageId);
-                LeasedQueue.Remove(messageId);
+                result.Enqueue(message.MessageId);
             }
 
-            MessagesOnDelivery = result.Values.ToList();
+            return result;
         }
+
     }
 
 }
