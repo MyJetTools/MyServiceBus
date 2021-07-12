@@ -11,18 +11,18 @@ namespace MyServiceBus.Domains.MessagesContent
 
         public static MessagesPageId GetMessageContentPageId(this long messageId)
         {
-            return new (messageId / MessagesInChunk);
+            return new MessagesPageId(messageId / MessagesInChunk);
         }
         
         public static MessagesPageId GetMessageContentPageId(this MessageContentGrpcModel message)
         {
-            return new (message.MessageId / MessagesInChunk);
+            return new MessagesPageId(message.MessageId / MessagesInChunk);
         }
         
         public static Dictionary<long, long> GetActiveMessagePages(this MyTopic topic)
         {
             var result = new Dictionary<long, long>();
-            foreach (var queue in topic.GetQueues())
+            foreach (var queue in topic.Queues.GetAll())
             {
                 
                 var pageId = queue.GetMinMessageId().GetMessageContentPageId();

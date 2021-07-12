@@ -27,7 +27,7 @@ namespace MyServiceBus.Domains
 
         private readonly object _lockObject;
 
-        private readonly Queue<TaskCompletionSource<LockHandler>> _awaitingLocks = new ();
+        private readonly Queue<TaskCompletionSource<LockHandler>> _awaitingLocks = new Queue<TaskCompletionSource<LockHandler>>();
 
         public AsyncLock(object lockObject)
         {

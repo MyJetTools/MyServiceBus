@@ -23,7 +23,7 @@ namespace MyServiceBus.Domains.Persistence
         private readonly IMetricCollector _metricCollector;
 
         private readonly Dictionary<string, List<MessageContentGrpcModel>> _messagesToPersist 
-            = new ();
+            = new Dictionary<string, List<MessageContentGrpcModel>>();
 
         public MessagesToPersistQueue(IMetricCollector metricCollector)
         {

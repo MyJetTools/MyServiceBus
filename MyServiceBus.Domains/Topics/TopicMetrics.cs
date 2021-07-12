@@ -5,13 +5,13 @@ namespace MyServiceBus.Domains.Topics
 {
     public class TopicMetrics
     {
-        public MetricPerSecond PublishPayloadsPerSecond { get; } = new ();
-        public MetricPerSecond PublishedMessagesPerSecond { get; } = new();
+        public MetricPerSecond PublishPayloadsPerSecond { get; } = new MetricPerSecond();
+        public MetricPerSecond PublishedMessagesPerSecond { get; } = new MetricPerSecond();
 
 
-        private readonly MetricHistory<int> _publishPerSecond = new ();
+        private readonly MetricHistory<int> _publishPerSecond = new MetricHistory<int>();
 
-        private readonly object _lock = new();
+        private readonly object _lock = new object();
         public void OneSecondTimer()
         {
             lock (_lock)

@@ -111,7 +111,7 @@ namespace MyServiceBus.Server.Hubs
 
                 foreach (var topic in ServiceLocator.TopicsList.Get())
                 {
-                    foreach (var topicQueue in topic.GetQueues())
+                    foreach (var topicQueue in topic.Queues.GetAll())
                     {
 
                         var lastSentSnapshotId =

@@ -10,12 +10,14 @@ using MyServiceBus.Domains.Topics;
 
 namespace MyServiceBus.Domains.Queues
 {
-
-
-
+    
+    public interface ITopicQueueRwAccess
+    {
+        QueueSubscribersList SubscribersList { get; }
+    }
     
     
-    public class TopicQueue 
+    public class TopicQueue : ITopicQueueRwAccess
     {
         private class ExecutionMonitoring
         {
@@ -45,18 +47,34 @@ namespace MyServiceBus.Domains.Queues
         
         private readonly QueueWithIntervals _queue;
 
-        private readonly object _queueLock = new();
+        private readonly object _queueLock = new object();
 
-        private readonly Dictionary<long, int> _attempts = new();
+        private readonly Dictionary<long, int> _attempts = new Dictionary<long, int>();
 
-        private readonly MetricHistory<int> _executionDuration = new ();
+        private readonly MetricHistory<int> _executionDuration = new MetricHistory<int>();
 
-        private readonly ExecutionMonitoring _executionMonitoring = new ();
+        private readonly ExecutionMonitoring _executionMonitoring = new ExecutionMonitoring();
+        
+        
+        public bool Disposed { get; private set; }
 
         
-        public TopicQueueMetrics Metrics { get; } = new ();
+        public TopicQueueMetrics Metrics { get; } = new TopicQueueMetrics();
 
-        public QueueSubscribersList SubscribersList { get; }
+        private readonly QueueSubscribersList _subscribersList;
+
+
+        public int SubscribersCount => _subscribersList.GetCount();
+
+
+        public void DisposeIfItDoesNotHaveSubscribers()
+        {
+            lock (_queueLock)
+            {
+                if (_subscribersList.GetCount() == 0)
+                    Disposed = true;
+            }
+        }
 
         public TopicQueue(MyTopic topic, string queueId, TopicQueueType topicQueueType, IEnumerable<IQueueIndexRange> ranges)
         {
@@ -64,7 +82,7 @@ namespace MyServiceBus.Domains.Queues
             QueueId = queueId;
             TopicQueueType = topicQueueType;
             _queue = new QueueWithIntervals(ranges);
-            SubscribersList = new QueueSubscribersList(this);
+            _subscribersList = new QueueSubscribersList(this);
         }
 
         public TopicQueue(MyTopic topic, string queueId, TopicQueueType topicQueueType, long messageId)
@@ -73,7 +91,7 @@ namespace MyServiceBus.Domains.Queues
             QueueId = queueId;
             TopicQueueType = topicQueueType;
             _queue = new QueueWithIntervals(messageId);
-            SubscribersList = new QueueSubscribersList(this);
+            _subscribersList = new QueueSubscribersList(this);
         }
 
 
@@ -148,61 +166,6 @@ namespace MyServiceBus.Domains.Queues
             }
         }
 
-
-
-        /*
-        public void ConfirmDelivery(TheQueueSubscriber subscriber, TimeSpan executionDuration)
-        {
-            lock (_topicLock)
-            {
-                _executionMonitoring.UpdateLastAmount(subscriber.MessagesOnDelivery.Count, executionDuration, false);
-                subscriber.SetToUnLeased(); 
-            }
-        }
-
-        
-        public void ConfirmSomeDelivered(TheQueueSubscriber subscriber, TimeSpan executionDuration, QueueWithIntervals okDelivered)
-        {
-            lock (_queueLock)
-            {
-                _executionMonitoring.UpdateLastAmount(subscriber.MessagesOnDelivery.Count, executionDuration, true);
-
-                var messagesToGoBack = subscriber.MessagesOnDelivery.ToDictionary(itm => itm.message.MessageId);
-                
-                foreach (var messageId in okDelivered)
-                    messagesToGoBack.Remove(messageId);
-                
-                
-                DisposeNotDeliveredMessages(messagesToGoBack.Values, 1);
-                
-                
-                subscriber.SetToUnLeased(); 
-            }
-        }
-        
-        public void ConfirmMessagesByNotDelivery(TheQueueSubscriber subscriber, TimeSpan executionDuration, QueueWithIntervals confirmedMessages)
-        {
-            lock (_topicLock)
-            {
-                _executionMonitoring.UpdateLastAmount(confirmedMessages.Count, executionDuration, false);
-
-                subscriber.ConfirmedMessagesAsDelivered(confirmedMessages);
-                
-            }
-        }
-
-        public void ConfirmNotDelivery(TheQueueSubscriber subscriber, TimeSpan executionDuration)
-        {
-            lock (_topicLock)
-            {
-                _executionMonitoring.UpdateLastAmount(subscriber.MessagesOnDelivery.Count, executionDuration, true);
-
-                DisposeNotDeliveredMessages(subscriber.MessagesOnDelivery, 1);
-                subscriber.SetToUnLeased();
-            }
-        }
-*/
-
         public void SetMinimalMessageId(long minMessageId, long maxMessageId)
         {
             lock (_queueLock)
@@ -239,35 +202,6 @@ namespace MyServiceBus.Domains.Queues
             }
         }
 
-
-        /*
-        public async ValueTask<bool> DisconnectedAsync(IMyServiceBusSubscriberSession session)
-        {
-            
-            var theSubscriber = SubscribersList.Unsubscribe(session);
-            
-            if (theSubscriber == null)
-                return false;
-
-
-            while (theSubscriber.Status == SubscriberStatus.Leased)
-                await Task.Delay(100);
-
-
-            lock (_topicLock)
-            {
-                if (theSubscriber.MessagesOnDelivery.Count > 0)
-                {
-                    _executionMonitoring.UpdateLastAmount(theSubscriber.MessagesOnDelivery.Count, DateTime.UtcNow - theSubscriber.OnDeliveryStart, true);
-                    DisposeNotDeliveredMessages(theSubscriber.MessagesOnDelivery, 1);
-                }
-
-                return true;
-            }
-
-        }
-        */
-
         public override string ToString()
         {
 
@@ -295,22 +229,6 @@ namespace MyServiceBus.Domains.Queues
 
         }
 
-        /*
-        public void SetInterval(long minId, long maxId)
-        {
-            lock (_topicLock)
-            {
-                var subscribersCount = SubscribersList.GetCount();
-
-                if (subscribersCount > 0)
-                    throw new Exception(
-                        $"Queue has: {subscribersCount}. You can rewind the queue only if it has 0 subscribers");
-
-                _queue.SetMinMessageId(minId, maxId);
-            }
-        }
-*/
-
         public long GetExecutionDurationSnapshotId()
         {
             lock (_executionDuration)
@@ -330,7 +248,10 @@ namespace MyServiceBus.Domains.Queues
         public void OneSecondTimer()
         {
             
-            //SubscribersList.OneSecondTimer();
+            if (Disposed)
+                return;
+            
+            _subscribersList.OneSecondTimer();
             
             lock (_executionDuration)
             {
@@ -348,5 +269,23 @@ namespace MyServiceBus.Domains.Queues
         }
 
 
+        QueueSubscribersList ITopicQueueRwAccess.SubscribersList => _subscribersList;
+
+        public void GetRwAccess(Action<ITopicQueueRwAccess> rwAccess)
+        {
+            lock (_queueLock)
+            {
+                if (!Disposed)
+                    rwAccess(this);
+            }
+        }
+        
+        public T GetRwAccess<T>(Func<ITopicQueueRwAccess, T> rwAccess)
+        {
+            lock (_queueLock)
+            {
+                return Disposed ?default : rwAccess(this) ;
+            }
+        }
     }
 }

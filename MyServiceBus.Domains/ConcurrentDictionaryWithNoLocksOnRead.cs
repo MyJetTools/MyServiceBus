@@ -6,9 +6,9 @@ namespace MyServiceBus.Domains
 {
     public class ConcurrentDictionaryWithNoLocksOnRead<TKey, TValue>
     {
-        private Dictionary<TKey, TValue> _dictionary = new ();
+        private Dictionary<TKey, TValue> _dictionary = new Dictionary<TKey, TValue>();
         private IReadOnlyList<TValue> _itemsAsList = Array.Empty<TValue>();
-        private readonly object _lockObject = new ();
+        private readonly object _lockObject = new object();
         
         public int SnapshotId { get; private set; }
 

@@ -18,7 +18,7 @@ namespace MyServiceBus.Server.Controllers
             if(topic == null)
                 return Conflict($"Topic {topicId} is not found");
 
-            var queue = topic.TryGetQueue(queueId);
+            var queue = topic.Queues.TryGetQueue(queueId);
             
             if (queue == null)
                 return Conflict($"Queue {topicId}/{queueId} is not found");

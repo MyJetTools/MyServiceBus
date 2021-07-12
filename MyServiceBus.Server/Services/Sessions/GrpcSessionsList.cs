@@ -138,5 +138,7 @@ namespace MyServiceBus.Server.Services.Sessions
         }
 
         public int Count => _sessionsAsList.Count;
+        
+        //ToDo - Plug Disconnect to Session
     }
 }

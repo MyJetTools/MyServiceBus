@@ -7,7 +7,7 @@ namespace MyServiceBus.Domains.Metrics
 {
     public class MetricHistory<T>
     {
-        private readonly Queue<T> _items = new ();
+        private readonly Queue<T> _items = new Queue<T>();
 
         private IReadOnlyList<T> _asList;
 
@@ -35,9 +35,9 @@ namespace MyServiceBus.Domains.Metrics
     public class MetricsHistoryByTopic<T>
     {
         
-        private readonly Dictionary<string, MetricHistory<T>> _messagesPerSeconds = new ();
+        private readonly Dictionary<string, MetricHistory<T>> _messagesPerSeconds = new Dictionary<string, MetricHistory<T>>();
 
-        private readonly ReaderWriterLockSlim _lockSlim = new ();
+        private readonly ReaderWriterLockSlim _lockSlim = new ReaderWriterLockSlim();
 
         public void PutData(string topicId, T amount)
         {

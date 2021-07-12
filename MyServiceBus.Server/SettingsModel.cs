@@ -1,3 +1,4 @@
+using System;
 using MyServiceBus.Domains;
 using MyYamlParser;
 
@@ -13,6 +14,9 @@ namespace MyServiceBus.Server
 
         [YamlProperty(defaultValue: 1024*1024*3)]
         public int MaxPersistencePackage { get; set; }
+
+        [YamlProperty]
+        public TimeSpan QueueGcTimeout { get; set; }
     }
 
 }

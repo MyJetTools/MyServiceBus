@@ -13,16 +13,12 @@ namespace MyServiceBus.Domains.QueueSubscribers
     {
         private readonly TopicQueue _topicQueue;
         
-        private readonly Dictionary<string, QueueSubscriber> _subscribers 
-            = new ();
+        private readonly DictionaryWithList<string, QueueSubscriber> _subscribers 
+            = new DictionaryWithList<string, QueueSubscriber>();
         
         private readonly Dictionary<long, QueueSubscriber> _subscribersByDeliveryId 
-            = new ();
+            = new Dictionary<long, QueueSubscriber>();
 
-        private IReadOnlyList<QueueSubscriber> _subscribersAsList = Array.Empty<QueueSubscriber>();
-
-
-        private readonly object _lockObject = new ();
 
         public QueueSubscribersList(TopicQueue topicQueue)
         {
@@ -31,8 +27,7 @@ namespace MyServiceBus.Domains.QueueSubscribers
 
         public QueueSubscriber Subscribe(MyServiceBusSession session)
         {
-            lock (_lockObject)
-            {
+   
                 if (_subscribers.ContainsKey(session.Id))
                     throw new Exception($"Subscriber to topic: {_topicQueue.Topic}  and queue: {_topicQueue.QueueId} is already exists");
 
@@ -40,40 +35,36 @@ namespace MyServiceBus.Domains.QueueSubscribers
                 
                 _subscribers.Add(session.Id, theSubscriber);
                 _subscribersByDeliveryId.Add(theSubscriber.ConfirmationId, theSubscriber);
-                _subscribersAsList = _subscribers.Values.ToList();
 
                 return theSubscriber;
-            }
         }
 
 
         private QueueSubscriber Unsubscribe(string sessionId)
         {
-            if (_subscribers.Remove(sessionId, out var removedItem))
-            {
-                _subscribersByDeliveryId.Remove(removedItem.ConfirmationId);
-                _subscribersAsList = _subscribers.Values.ToList();
-                return removedItem;
-            }
+            var removedItem = _subscribers.TryRemoveOrDefault(sessionId);
+            
+            if (removedItem == null) 
+                return null;
+            
+            _subscribersByDeliveryId.Remove(removedItem.ConfirmationId);
+            return removedItem;
 
-            return null;
         }
-        
+
         public QueueSubscriber Unsubscribe(MyServiceBusSession session)
         {
-            lock (_lockObject)
-            {
-                return Unsubscribe(session.Id);
-            }
+
+            return Unsubscribe(session.Id);
+
         }
 
         public QueueSubscriber LeaseSubscriber()
         {
-            lock (_lockObject)
-            {
+
                 var readyToBeLeased
                     = _subscribers
-                        .Values
+                        .GetAllValues()
                         .FirstOrDefault(itm => itm.Status == SubscriberStatus.Ready);
 
                 if (readyToBeLeased == null)
@@ -82,77 +73,61 @@ namespace MyServiceBus.Domains.QueueSubscribers
                 readyToBeLeased.SetToLeased();
 
                 return readyToBeLeased;
-            }
         }
 
         public void UnLease(QueueSubscriber subscriber)
         {
-            lock (_lockObject)
-            {
                 if (subscriber.MessagesSize > 0)
                     subscriber.SetOnDeliveryAndSendMessages();
                 else
                     subscriber.Reset();
-            }
         }
 
         public QueueSubscriber TryGetSubscriber(MyServiceBusSession session)
         {
-            lock (_lockObject)
-            {
-                return _subscribers.TryGetValue(session.Id, out var subscriber) 
-                    ? subscriber 
-                    : null;
-            }
+            return _subscribers.TryGetValue(session.Id); 
         }
 
         public QueueSubscriber TryGetSubscriber(long confirmationId)
         {
-            lock (_lockObject)
-            {
                 return _subscribersByDeliveryId.TryGetValue(confirmationId, out var subscriber) 
                     ? subscriber 
                     : null;
-            }
         }
         
         
         public int GetCount()
         {
-            lock (_lockObject)
-            {
                 return _subscribers.Count;
-            }
         }
 
 
         public void OneSecondTimer()
         {
-            foreach (var subscriber in _subscribersAsList)
+            foreach (var subscriber in _subscribers.GetAllValues())
                 subscriber.OneSecondTimer();
         }
 
 
         public IReadOnlyList<QueueSubscriber> GetSubscribers()
         {
-            return _subscribersAsList;
+            return _subscribers.GetAllValues();
         }
 
         public IReadOnlyList<QueueSubscriber> RemoveAllExceptThisOne(QueueSubscriber subscriber)
         {
-            lock (_lockObject)
-            {
-                var result =  _subscribers.Values.Where(itm => itm.Session.Id != subscriber.Session.Id)
-                    .ToList();
 
-                foreach (var queueSubscriber in result)
-                    Unsubscribe(queueSubscriber.Session.Id);
+            var result = _subscribers.GetAllValues().Where(itm => itm.Session.Id != subscriber.Session.Id)
+                .ToList();
 
-                return result;
-            }
+            foreach (var queueSubscriber in result)
+                Unsubscribe(queueSubscriber.Session.Id);
+
+            return result;
+
         }
-        
-        
+
+
 
     }
 

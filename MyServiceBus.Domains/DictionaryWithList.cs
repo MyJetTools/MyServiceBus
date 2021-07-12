@@ -7,35 +7,56 @@ namespace MyServiceBus.Domains
     public class DictionaryWithList<TKey, TValue>
     {
 
-        private readonly Dictionary<TKey, TValue> _dictionary = new ();
+        private readonly Dictionary<TKey, TValue> _dictionary = new Dictionary<TKey, TValue>();
         private IReadOnlyList<TValue> _itemsAsList = Array.Empty<TValue>();
         
         public int SnapshotId { get; private set; }
-        
+
         public void Add(TKey key, TValue value)
         {
-            lock (_dictionary)
-            {
-                _dictionary.Add(key, value);
-                _itemsAsList = _dictionary.Values.ToList();
-                SnapshotId++;
-            }
+
+            _dictionary.Add(key, value);
+            _itemsAsList = _dictionary.Values.ToList();
+            SnapshotId++;
+        }
+
+        public TValue TryGetValue(TKey key)
+        {
+            if (_dictionary.TryGetValue(key, out var result))
+                return result;
+
+            return default;
+        }
+
+        public bool ContainsKey(TKey key)
+        {
+            return _dictionary.ContainsKey(key);
         }
 
         public bool Remove(TKey key)
         {
-            lock (_dictionary)
+
+            var result = _dictionary.Remove(key);
+            if (result)
             {
-                var result = _dictionary.Remove(key);
-                if (result)
-                {
-                    _itemsAsList = _dictionary.Values.ToList();
-                    SnapshotId++;
-                }
-                return result;
+                _itemsAsList = _dictionary.Values.ToList();
+                SnapshotId++;
             }
+
+            return result;
         }
 
+        public TValue TryRemoveOrDefault(TKey key)
+        {
+            if (_dictionary.Remove(key, out var result))
+            {
+                _itemsAsList = _dictionary.Values.ToList();
+                SnapshotId++;
+                return result;
+            }
+
+            return default;
+        }
 
         public IReadOnlyList<TValue> GetAllValues()
         {
@@ -43,6 +64,8 @@ namespace MyServiceBus.Domains
         }
 
         public TValue this[TKey key] => _dictionary[key];
+
+        public int Count => _itemsAsList.Count;
     }
 
 }

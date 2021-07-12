@@ -15,7 +15,7 @@ namespace MyServiceBus.Server.Hubs
 
         public IReadOnlyList<TopicQueue> GetQueuesIfNotSynchronized()
         {
-            var (queues, snapshotId) = Topic.GetQueuesWithSnapshotId();
+            var (queues, snapshotId) = Topic.Queues.GetQueuesWithSnapshotId();
             lock (this)
             {
 

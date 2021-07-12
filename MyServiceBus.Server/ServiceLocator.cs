@@ -154,8 +154,9 @@ namespace MyServiceBus.Server
                 {
                     _metricCollector.UpdateTopicQueueSize(myTopic);
 
-                    foreach (var queue in myTopic.GetQueues())
+                    foreach (var queue in myTopic.Queues.GetAll())
                     {
+                        //ToDo - Why are we doing this? 
                         _metricCollector.UpdateTopicQueueSize(queue);
                     }
                 }

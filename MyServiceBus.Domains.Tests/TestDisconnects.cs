@@ -33,7 +33,7 @@ namespace MyServiceBus.Domains.Tests
 
             Assert.AreEqual(queueName, lastDelivered.topicQueue.QueueId); 
             
-            session.Disconnect();
+            session.Disconnect(DateTime.UtcNow);
             
             Assert.AreEqual(1, ioc.GetMessagesCount(topicName, queueName));
             
@@ -86,7 +86,7 @@ namespace MyServiceBus.Domains.Tests
             session2.PublishMessage(topicName, new byte[] {5}, nowTime);
             Console.WriteLine("Double Publish:         "+queue);
             
-            session.Disconnect();
+            session.Disconnect(DateTime.UtcNow);
             
             Console.WriteLine("After Disconnect:       "+queue);
             
@@ -96,7 +96,7 @@ namespace MyServiceBus.Domains.Tests
             Console.WriteLine("6:                      "+queue);
 
             
-            session2.Disconnect();
+            session2.Disconnect(DateTime.UtcNow);
             
             Console.WriteLine("7:                      "+queue);
         }

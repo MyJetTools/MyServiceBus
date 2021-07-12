@@ -8,11 +8,11 @@ namespace MyServiceBus.Domains.Sessions
     public class SubscribersInfo
     {
 
-        public MetricPerSecond DeliveryPayloadsPerSecond { get; } = new ();
-        public MetricPerSecond DeliveryMessagesPerSecond { get; } = new ();
+        public MetricPerSecond DeliveryPayloadsPerSecond { get; } = new MetricPerSecond();
+        public MetricPerSecond DeliveryMessagesPerSecond { get; } = new MetricPerSecond();
 
         
-        private readonly Dictionary<string, Dictionary<string, SubscriberInfo>> _subscribers = new ();
+        private readonly Dictionary<string, Dictionary<string, SubscriberInfo>> _subscribers = new Dictionary<string, Dictionary<string, SubscriberInfo>>();
 
         private IReadOnlyList<SubscriberInfo> _subscribersAsList = Array.Empty<SubscriberInfo>();
 

@@ -26,7 +26,7 @@ namespace MyServiceBus.Server.Tcp
             if (topic == null)
                 return $"There is a confirmation {confirmationId} for a topic {topicId} which is not found";
 
-            var topicQueue = topic.TryGetQueue(queueId);
+            var topicQueue = topic.Queues.TryGetQueue(queueId);
             
             if (topicQueue == null)
                 return $"There is a confirmation {confirmationId} for a queue {queueId} with topic {topicId} which is not found";
@@ -47,7 +47,7 @@ namespace MyServiceBus.Server.Tcp
                 return
                     $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId} which is not found";
 
-            var topicQueue = topic.TryGetQueue(packet.QueueId);
+            var topicQueue = topic.Queues.TryGetQueue(packet.QueueId);
 
             if (topicQueue == null)
                 return
@@ -69,7 +69,7 @@ namespace MyServiceBus.Server.Tcp
                 return
                     $"There is a confirmation {packet.ConfirmationId} for a topic {packet.TopicId}/{packet.QueueId} which is not found";
             
-            var topicQueue = topic.TryGetQueue(packet.QueueId);
+            var topicQueue = topic.Queues.TryGetQueue(packet.QueueId);
 
             if (topicQueue == null)
                 return
@@ -196,7 +196,7 @@ namespace MyServiceBus.Server.Tcp
         {
             ServiceLocator.ConnectionsLog.AddLog(Id, ContextName, GetIp(), "Disconnected");
             ServiceLocator.TcpConnectionsSnapshotId++;
-            return ServiceLocator.SubscriberOperations.DisconnectSubscriberAsync(SessionContext);
+            return ServiceLocator.SubscriberOperations.DisconnectSubscriberAsync(SessionContext, DateTime.UtcNow);
 
         }
 

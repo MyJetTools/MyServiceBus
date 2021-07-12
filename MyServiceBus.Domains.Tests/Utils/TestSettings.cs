@@ -7,5 +7,6 @@ namespace MyServiceBus.Domains.Tests.Utils
     {
         public int MaxDeliveryPackageSize { get; } = 1024 * 1024;
         public int MaxPersistencePackage { get; } = 1024 * 1024 * 3;
+        public TimeSpan QueueGcTimeout { get; } = TimeSpan.FromSeconds(20);
     }
 }

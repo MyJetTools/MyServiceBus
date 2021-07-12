@@ -88,7 +88,7 @@ namespace MyServiceBus.Domains.Tests
             session.PublishMessage(topicName, new byte[] {2}, nowTime);
             session.PublishMessage(topicName, new byte[] {3}, nowTime);
 
-            session.Disconnect();
+            session.Disconnect(DateTime.UtcNow);
 
             nowTime = nowTime.AddSeconds(5);
             ioc.SetCurrentTime(nowTime);

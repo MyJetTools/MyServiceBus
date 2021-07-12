@@ -12,12 +12,7 @@ namespace MyServiceBus.Server.Controllers
         [HttpDelete("/Queues/")]
         public IActionResult Delete([FromQuery][Required]string topicId, [FromQuery][Required]string queueId)
         {
-            var topic = ServiceLocator.TopicsList.TryGet(topicId);
-            
-            if(topic == null)
-                return Conflict($"Topic {topicId} is not found");
-            
-            topic.DeleteQueue(queueId);
+            ServiceLocator.SubscriberOperations.DeleteQueue(topicId, queueId);
 
             return Content("Ok");
         }
@@ -31,7 +26,7 @@ namespace MyServiceBus.Server.Controllers
             if (topic == null)
                 return Conflict($"Topic {topicId} is not found");
 
-            var topicQueue = topic.TryGetQueue(queueId);
+            var topicQueue = topic.Queues.TryGetQueue(queueId);
             
             if (topicQueue == null)
                 return Conflict($"Topic {topicId} is not found");
@@ -52,7 +47,7 @@ namespace MyServiceBus.Server.Controllers
             if (topic == null)
                 return Conflict($"Topic {topicId} is not found");
 
-            var queue = topic.GetQueue(queueId);
+            var queue = topic.Queues.TryGetQueue(queueId);
             
             if (queue == null)
                     return Conflict($"Queue {queueId} is not found");
@@ -62,7 +57,7 @@ namespace MyServiceBus.Server.Controllers
 
 
 
-            foreach (var subscriber in queue.SubscribersList.GetSubscribers())
+            foreach (var subscriber in queue.GetRwAccess(rwAccess => rwAccess.SubscribersList.GetSubscribers()))
             {
                 if (subscriber.Status == SubscriberStatus.OnDelivery &&
                     DateTime.UtcNow - subscriber.OnDeliveryStart > TenSeconds)

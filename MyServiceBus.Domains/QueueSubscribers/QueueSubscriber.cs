@@ -18,7 +18,7 @@ namespace MyServiceBus.Domains.QueueSubscribers
         
         public TopicQueue TopicQueue { get;  }
 
-        public readonly MetricPerSecond DeliveryEventsPerSecond = new ();
+        public readonly MetricPerSecond DeliveryEventsPerSecond = new MetricPerSecond();
 
         public QueueSubscriber(MyServiceBusSession session, TopicQueue topicQueue)
         {
@@ -30,7 +30,7 @@ namespace MyServiceBus.Domains.QueueSubscribers
 
         public MyServiceBusSession Session { get; }
 
-        public readonly QueueWithIntervals LeasedQueue = new ();
+        public readonly QueueWithIntervals LeasedQueue = new QueueWithIntervals();
 
         public IReadOnlyList<(MessageContentGrpcModel message, int attemptNo)> MessagesOnDelivery { get; private set; }
         public DateTime OnDeliveryStart { get; private set; }

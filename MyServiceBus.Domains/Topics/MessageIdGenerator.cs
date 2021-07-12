@@ -12,7 +12,7 @@ namespace MyServiceBus.Domains.Topics
     {
         public long Value { get; private set; }
 
-        private readonly object _lockObject = new ();
+        private readonly object _lockObject = new object();
 
 
         public void Lock(Action<INextMessageIdGenerator> callback)

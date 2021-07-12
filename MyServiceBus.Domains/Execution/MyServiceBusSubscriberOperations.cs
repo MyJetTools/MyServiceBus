@@ -36,13 +36,14 @@ namespace MyServiceBus.Domains.Execution
 
         public async ValueTask<QueueSubscriber> SubscribeToQueueAsync(TopicQueue topicQueue, MyServiceBusSession session)
         {
-            var queueSubscriber = topicQueue.SubscribersList.Subscribe(session);
+            
+            var queueSubscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.Subscribe(session));
             await _myServiceBusDeliveryHandler.SendMessagesAsync(topicQueue);
             
             
             if (topicQueue.TopicQueueType == TopicQueueType.PermanentWithSingleConnection)
             {
-                var subscriberToUnsubscribe  = topicQueue.SubscribersList.RemoveAllExceptThisOne(queueSubscriber);
+                var subscriberToUnsubscribe  =  topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.RemoveAllExceptThisOne(queueSubscriber));
 
                 foreach (var subscriber in subscriberToUnsubscribe)
                     HandleAfterUnsubscribe(subscriber);
@@ -61,7 +62,7 @@ namespace MyServiceBus.Domains.Execution
 
         public ValueTask ConfirmDeliveryAsync(TopicQueue topicQueue, long confirmationId)
         {
-            var subscriber = topicQueue.SubscribersList.TryGetSubscriber(confirmationId);
+            var subscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.TryGetSubscriber(confirmationId));
 
             if (subscriber == null)
                 throw new Exception($"Can not find subscriber by confirmationId {confirmationId}");
@@ -74,7 +75,7 @@ namespace MyServiceBus.Domains.Execution
         
         public ValueTask ConfirmNotDeliveryAsync(TopicQueue topicQueue, long confirmationId)
         {
-            var subscriber = topicQueue.SubscribersList.TryGetSubscriber(confirmationId);
+            var subscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.TryGetSubscriber(confirmationId));
 
             if (subscriber == null)
                 throw new Exception($"Can not find subscriber by confirmationId {confirmationId}");
@@ -87,7 +88,7 @@ namespace MyServiceBus.Domains.Execution
         
         public ValueTask ConfirmMessagesByConfirmedListAsync(TopicQueue topicQueue, long confirmationId, QueueWithIntervals confirmedMessages)
         {
-            var subscriber = topicQueue.SubscribersList.TryGetSubscriber(confirmationId);
+            var subscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.TryGetSubscriber(confirmationId));
 
             if (subscriber == null)
                 throw new Exception($"Can not find subscriber by confirmationId {confirmationId}");
@@ -105,7 +106,7 @@ namespace MyServiceBus.Domains.Execution
         
         public ValueTask ConfirmMessagesByNotConfirmedListAsync(TopicQueue topicQueue, long confirmationId, QueueWithIntervals notConfirmedMessages)
         {
-            var subscriber = topicQueue.SubscribersList.TryGetSubscriber(confirmationId);
+            var subscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.TryGetSubscriber(confirmationId));
 
             if (subscriber == null)
                 throw new Exception($"Can not find subscriber by confirmationId {confirmationId}");
@@ -121,21 +122,23 @@ namespace MyServiceBus.Domains.Execution
             return _myServiceBusDeliveryHandler.SendMessagesAsync(topicQueue);
         }
 
-        public async ValueTask DisconnectSubscriberAsync(MyServiceBusSession session)
+        public async ValueTask DisconnectSubscriberAsync(MyServiceBusSession session, DateTime now)
         {
             var topics = _topicsList.Get();
 
             foreach (var topic in topics)
             {
-                foreach (var queue in topic.GetQueues())
+                foreach (var queue in topic.Queues.GetAll())
                 {
 
-                    var subscriber = queue.SubscribersList.Unsubscribe(session);
+                    var subscriber = queue.GetRwAccess(rwAccess => rwAccess.SubscribersList.Unsubscribe(session)) ;
                     
                     if (subscriber == null)
                         continue;
 
                     subscriber.Session.Disconnected = true;
+
+                    queue.Metrics.LastDisconnect = now;
 
                     while (subscriber.Status == SubscriberStatus.Leased)
                         await Task.Delay(100);
@@ -148,8 +151,6 @@ namespace MyServiceBus.Domains.Execution
                     
                     await _myServiceBusDeliveryHandler.SendMessagesAsync(queue);
                     
-                    //ToDo - сделать таймер на удаление очередей
-
                 }
             }
         }
@@ -175,6 +176,12 @@ namespace MyServiceBus.Domains.Execution
             topicQueue.Topic.SetQueueMessageId(messageId, topicQueue);
 
             return ReplayMessageResult.Ok;
+        }
+
+
+        public void DeleteQueue(string topicId, string queueId)
+        {
+            throw new NotImplementedException("Implement");
         }
         
     }

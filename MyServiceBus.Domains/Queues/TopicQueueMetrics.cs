@@ -1,3 +1,5 @@
+using System;
+
 namespace MyServiceBus.Domains.Queues
 {
     public class TopicQueueMetrics
@@ -5,6 +7,10 @@ namespace MyServiceBus.Domains.Queues
         
         //ToDo - Plug Data Update to this Field
         public int MessagesOnDeliveryAmount { get; set; } 
+        
+        
+        //ToDo - Plug It
+        public DateTime LastDisconnect { get; set; }
         
     }
 }

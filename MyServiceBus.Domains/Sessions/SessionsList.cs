@@ -7,12 +7,12 @@ namespace MyServiceBus.Domains.Sessions
     public class SessionsList
     {
         private readonly Dictionary<string, MyServiceBusSession> _sessions =
-            new ();
+            new Dictionary<string, MyServiceBusSession>();
 
         private IReadOnlyList<MyServiceBusSession> _sessionsAsList = Array.Empty<MyServiceBusSession>();
 
 
-        private readonly object _lockObject = new ();
+        private readonly object _lockObject = new object();
 
 
         public MyServiceBusSession IssueSession()

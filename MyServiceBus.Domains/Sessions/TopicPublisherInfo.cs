@@ -6,11 +6,11 @@ namespace MyServiceBus.Domains.Sessions
     public class TopicPublisherInfo
     {
 
-        private Dictionary<string, DateTime> _topicsPublishers = new ();
+        private Dictionary<string, DateTime> _topicsPublishers = new Dictionary<string, DateTime>();
 
 
-        public readonly MetricPerSecond PublishPayloadsPerSecond = new ();
-        public readonly MetricPerSecond PublishMessagesPerSecond = new ();
+        public readonly MetricPerSecond PublishPayloadsPerSecond = new MetricPerSecond();
+        public readonly MetricPerSecond PublishMessagesPerSecond = new MetricPerSecond();
 
 
         public void AddIfNotExists(string topic)

@@ -92,7 +92,7 @@ namespace MyServiceBus.Domains.Execution
 
         public async ValueTask SendMessagesAsync(TopicQueue topicQueue)
         {
-            var leasedSubscriber = topicQueue.SubscribersList.LeaseSubscriber();
+            var leasedSubscriber = topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.LeaseSubscriber());
             
             if (leasedSubscriber == null)
                 return;
@@ -115,13 +115,13 @@ namespace MyServiceBus.Domains.Execution
             }
             finally
             {
-                topicQueue.SubscribersList.UnLease(leasedSubscriber);
+                topicQueue.GetRwAccess(rwAccess => rwAccess.SubscribersList.UnLease(leasedSubscriber));
             }
         }
 
         public async ValueTask SendMessagesAsync(MyTopic topic)
         {
-            foreach (var topicQueue in topic.GetQueues())
+            foreach (var topicQueue in topic.Queues.GetAll())
                 await SendMessagesAsync(topicQueue);
         }
 

@@ -22,7 +22,7 @@ namespace MyServiceBus.Domains.Tests.Utils
         
         public MyServiceBusSubscriberOperations SubscriberOperations { get; }
 
-        private TopicsList _topicsList;
+        private readonly TopicsList _topicsList;
 
         public MockConnection(IServiceProvider sr, string sessionsName, DateTime dt)
         {
@@ -91,10 +91,10 @@ namespace MyServiceBus.Domains.Tests.Utils
         }
         
 
-        public void Disconnect()
+        public void Disconnect(DateTime now)
         {
             Disconnected = true;
-            SubscriberOperations.DisconnectSubscriberAsync(Session);
+            SubscriberOperations.DisconnectSubscriberAsync(Session, now);
         }
 
         public ValueTask ConfirmDeliveryAsync(TopicQueue queue, long confirmationId)

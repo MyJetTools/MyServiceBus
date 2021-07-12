@@ -10,10 +10,10 @@ namespace MyServiceBus.Domains.MessagesContent
 
     public class MessagesContentCache
     {
-        private readonly Dictionary<long, MessagesPage> _messages = new ();
+        private readonly Dictionary<long, MessagesPage> _messages = new Dictionary<long, MessagesPage>();
         private readonly string _topicId;
 
-        private readonly ReaderWriterLockSlim _lockSlim = new ();
+        private readonly ReaderWriterLockSlim _lockSlim = new ReaderWriterLockSlim();
         public IReadOnlyList<long> Pages { get; private set; } = Array.Empty<long>();
 
         public MessagesContentCache(string topicId)

@@ -31,7 +31,7 @@ namespace MyServiceBus.Domains.Tests
             
             Assert.AreEqual(0, session2.GetSentPackagesCount());
             
-            session1.Disconnect();
+            session1.Disconnect(DateTime.UtcNow);
             
             Assert.AreEqual(1, session2.GetSentPackagesCount());
             

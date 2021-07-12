@@ -77,7 +77,7 @@ namespace MyServiceBus.Server.Hubs
         {
             try
             {
-                var connections = topicQueue.SubscribersList.GetCount();
+                var connections = topicQueue.GetRwAccess(rw => rw.SubscribersList.GetCount()) ;
                 var queueType = (int)topicQueue.TopicQueueType;
                 var messagesCount = topicQueue.GetMessagesCount();
                 var ready = topicQueue.GetReadyQueueSnapshot().Select(QueueSliceHubModel.Create);
@@ -178,7 +178,7 @@ namespace MyServiceBus.Server.Hubs
                     TopicPageModel.Create(itm.no + ":" + itm.size.ByteSizeToString(), itm.percent)),
                 MsgPerSec = topic.Metrics.PublishedMessagesPerSecond.Value,
                 ReqPerSec = topic.Metrics.PublishPayloadsPerSecond.Value,
-                Queues = topic.GetQueues().Select(TopicQueueHubModel.Create).Where(itm => itm != null)
+                Queues = topic.Queues.GetAll().Select(TopicQueueHubModel.Create).Where(itm => itm != null)
             };
 
         }

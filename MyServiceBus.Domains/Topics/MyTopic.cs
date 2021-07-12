@@ -14,11 +14,11 @@ namespace MyServiceBus.Domains.Topics
     public class MyTopic
     {
 
-        private readonly TopicQueueList _topicQueueList; 
+        public TopicQueueList Queues { get; }
         public MessageIdGenerator MessageIdGenerator { get; }
         public MessagesContentCache MessagesContentCache { get; }
         public AsyncLock MessagesPersistenceLock { get; }
-        public TopicMetrics Metrics { get; } = new ();
+        public TopicMetrics Metrics { get; } = new TopicMetrics();
         
         public override string ToString()
         {
@@ -29,7 +29,7 @@ namespace MyServiceBus.Domains.Topics
         {
             TopicId = id;
             MessageIdGenerator = new MessageIdGenerator(startMessageId);
-            _topicQueueList = new TopicQueueList();
+            Queues = new TopicQueueList();
             MessagesContentCache = new MessagesContentCache(id);
             MessagesPersistenceLock = new AsyncLock(new object());
         }
@@ -40,29 +40,12 @@ namespace MyServiceBus.Domains.Topics
         internal void OenSecondTimer()
         {
             Metrics.OneSecondTimer();
-            _topicQueueList.OneSecondTimer();
-        }
-
-        public IReadOnlyList<TopicQueue> GetQueues()
-        {
-            return _topicQueueList.GetQueues();
-        }
-        
-        public (IReadOnlyList<TopicQueue> queues, int snapshotId) GetQueuesWithSnapshotId()
-        {
-            return _topicQueueList.GetQueuesWithSnapshotId();
-        }
-
-        public long MessagesCount => _topicQueueList.GetMessagesCount();
-
-        public void DeleteQueue(string queueName)
-        {
-            _topicQueueList.DeleteQueue(queueName);
+            Queues.OneSecondTimer();
         }
 
         public TopicQueue CreateQueueIfNotExists(string queueName, TopicQueueType topicQueueType, bool overrideTopicQueueType)
         {
-            return _topicQueueList.CreateQueueIfNotExists(this, queueName, topicQueueType, MessageIdGenerator.Value, overrideTopicQueueType);
+            return Queues.CreateQueueIfNotExists(this, queueName, topicQueueType, MessageIdGenerator.Value, overrideTopicQueueType);
         }
 
         public IReadOnlyList<MessageContentGrpcModel> Publish(IEnumerable<PublishMessage> messages, DateTime now)
@@ -94,10 +77,6 @@ namespace MyServiceBus.Domains.Topics
             return newMessages;
         }
 
-        public long GetQueueMessagesCount(string queueName)
-        {
-            return _topicQueueList.GetQueueMessagesCount(queueName);
-        }
 
         public ITopicPersistence GetQueuesSnapshot()
         {
@@ -105,20 +84,10 @@ namespace MyServiceBus.Domains.Topics
             {
                 TopicId = TopicId,
                 MessageId = MessageIdGenerator.Value,
-                QueueSnapshots = _topicQueueList.GetQueuesSnapshot()
+                QueueSnapshots = Queues.GetQueuesSnapshot()
             };
         }
 
-
-        public TopicQueue GetQueue(string queueId)
-        {
-            return _topicQueueList.GetQueue(queueId);
-        }
-        
-        public TopicQueue? TryGetQueue(string queueId)
-        {
-            return _topicQueueList.TryGetQueue(queueId);
-        }
 
         public void Init(IReadOnlyList<IQueueSnapshot> queueSnapshots)
         {
@@ -130,7 +99,7 @@ namespace MyServiceBus.Domains.Topics
                     Console.WriteLine(indexRange.FromId + "-" + indexRange.ToId);
                 }
 
-                _topicQueueList.Init(this, queueSnapshot);
+                Queues.Init(this, queueSnapshot);
             }
         }
 

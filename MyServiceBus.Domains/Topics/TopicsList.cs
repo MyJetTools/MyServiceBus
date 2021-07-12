@@ -8,7 +8,7 @@ namespace MyServiceBus.Domains.Topics
     public class TopicsList
     {
         
-        private readonly ConcurrentDictionaryWithNoLocksOnRead<string, MyTopic> _topics = new ();
+        private readonly ConcurrentDictionaryWithNoLocksOnRead<string, MyTopic> _topics = new ConcurrentDictionaryWithNoLocksOnRead<string, MyTopic>();
 
         public int SnapshotId => _topics.SnapshotId;
 

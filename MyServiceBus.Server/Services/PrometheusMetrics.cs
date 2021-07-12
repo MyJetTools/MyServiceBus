@@ -29,7 +29,7 @@ namespace MyServiceBus.Server.Services
         {
             ServiceBusTopicQSize
                 .WithLabels(topic.TopicId)
-                .Set(topic.MessagesCount);
+                .Set(topic.Queues.GetMessagesCount());
         }
 
         public void UpdateTopicQueueSize(TopicQueue topicQueue)

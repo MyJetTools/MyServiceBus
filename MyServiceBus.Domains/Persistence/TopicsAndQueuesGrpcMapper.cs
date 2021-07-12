@@ -12,7 +12,7 @@ namespace MyServiceBus.Domains.Persistence
     {
         private static QueueIndexRangeGrpcModel ToGrpcModel(this IQueueIndexRange src)
         {
-            return new ()
+            return new QueueIndexRangeGrpcModel()
             {
                 FromId = src.FromId,
                 ToId = src.ToId
@@ -44,7 +44,7 @@ namespace MyServiceBus.Domains.Persistence
 
         private static QueueSnapshotGrpcModel ToGrpcModel(this IQueueSnapshot src)
         {
-            return new()
+            return new QueueSnapshotGrpcModel()
             {
                 QueueId = src.QueueId,
                 Ranges = src.Ranges.Select(itm => itm.ToGrpcModel()).ToArray(),
@@ -56,7 +56,7 @@ namespace MyServiceBus.Domains.Persistence
 
         private static TopicAndQueuesSnapshotGrpcModel ToGrpcModel(this ITopicPersistence src)
         {
-            return new ()
+            return new TopicAndQueuesSnapshotGrpcModel()
             {
                 TopicId = src.TopicId,
                 MessageId = src.MessageId,
@@ -83,7 +83,7 @@ namespace MyServiceBus.Domains.Persistence
         
         private static QueueIndexRangeReadOnly  ToDomain(this QueueIndexRangeGrpcModel src)
         {
-            return new (src.FromId, src.ToId);
+            return new QueueIndexRangeReadOnly(src.FromId, src.ToId);
         }
         
         

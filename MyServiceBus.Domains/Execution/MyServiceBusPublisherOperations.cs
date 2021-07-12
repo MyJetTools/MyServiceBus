@@ -77,7 +77,7 @@ namespace MyServiceBus.Domains.Execution
             if (persistImmediately)
                 PersistMessagesContent(topic);
 
-            foreach (var topicQueue in topic.GetQueues())
+            foreach (var topicQueue in topic.Queues.GetAll())
                 topicQueue.EnqueueMessages(addedMessages.Select(itm => itm.MessageId));
 
             await _myServiceBusDeliveryHandler.SendMessagesAsync(topic);

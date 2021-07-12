@@ -25,7 +25,7 @@ namespace MyServiceBus.Domains
     internal class LogsByTopic
     {
         
-        private readonly Queue<LogItem> _items = new ();
+        private readonly Queue<LogItem> _items = new Queue<LogItem>();
 
         public void Add(LogItem item)
         {
@@ -38,7 +38,7 @@ namespace MyServiceBus.Domains
     public class Log
     {
 
-        private readonly Dictionary<string, LogsByTopic> _messages = new ();
+        private readonly Dictionary<string, LogsByTopic> _messages = new Dictionary<string, LogsByTopic>();
 
         public void AddLog(LogLevel level, TopicQueue queue, string message)
         {

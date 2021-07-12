@@ -12,9 +12,9 @@ namespace MyServiceBus.Domains.Sessions
     {
         private readonly Action<MyServiceBusSession> _onDispose;
         
-        public readonly TopicPublisherInfo PublisherInfo = new ();
+        public readonly TopicPublisherInfo PublisherInfo = new TopicPublisherInfo();
 
-        public readonly SubscribersInfo Subscribers = new ();
+        public readonly SubscribersInfo Subscribers = new SubscribersInfo();
         
         public DateTime Created { get;  } = DateTime.UtcNow;
         

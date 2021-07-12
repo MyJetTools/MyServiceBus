@@ -5,8 +5,8 @@ namespace MyServiceBus.Domains.Sessions
 {
     public class SubscriberInfo
     {
-        public MetricPerSecond DeliveryPayloadsPerSecond { get; } = new ();
-        public MetricPerSecond DeliveryMessagesPerSecond { get; } = new ();
+        public MetricPerSecond DeliveryPayloadsPerSecond { get; } = new MetricPerSecond();
+        public MetricPerSecond DeliveryMessagesPerSecond { get; } = new MetricPerSecond();
         
         public DateTime LastDeliveryPacketSendDateTime { get; set; }
 

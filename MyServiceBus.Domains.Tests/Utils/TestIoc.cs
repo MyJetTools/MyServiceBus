@@ -4,8 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using MyServiceBus.Domains.Execution;
 using MyServiceBus.Domains.MessagesContent;
 using MyServiceBus.Domains.Persistence;
-using MyServiceBus.Domains.Queues;
-using MyServiceBus.Domains.QueueSubscribers;
 using MyServiceBus.Domains.Tests.GrpcMocks;
 using MyServiceBus.Domains.Topics;
 using MyServiceBus.Persistence.Grpc;
@@ -62,7 +60,7 @@ namespace MyServiceBus.Domains.Tests.Utils
         public static int GetMessagesCount(this IServiceProvider ioc, string topicId, string queueId)
         {
             var topic = ioc.GetRequiredService<TopicsList>().Get(topicId);
-            return (int)topic.GetQueueMessagesCount(queueId);
+            return (int)topic.Queues.GetQueue(queueId).GetMessagesCount();
         }
         
         public static MessagesPage GetMessagesFromPersistentStorage(this IServiceProvider ioc, string topicId)
