@@ -23,19 +23,45 @@ namespace MyServiceBus.Abstractions.QueueIndex
             FromId = src.FromId;
             ToId = src.ToId;
         }
-        
-        public QueueIndexRange(long startMessageId)
+
+        public static QueueIndexRange CreateEmpty(long messageId = 0)
         {
-            FromId = startMessageId;
-            ToId = FromId - 1;
+            return new QueueIndexRange(messageId, messageId-1);
         }
+
+        public bool TryJoin(long idToJoin)
+        {
+            if (IsEmpty())
+            {
+                FromId = idToJoin;
+                ToId = idToJoin;
+            }
+
+            if (idToJoin == FromId - 1)
+            {
+                FromId = idToJoin;
+                return true;
+            }
+
+            if (idToJoin == ToId + 1)
+            {
+                ToId = idToJoin;
+                return true;
+            }
+
+            return false;
+        }
+
         
         
         public long FromId { get; set; }
         public long ToId { get; set; }
 
-        public long GetNextMessage()
+        public long Dequeue()
         {
+            if (FromId>ToId)
+                return -1;
+            
             var result = FromId;
             FromId++;
             return result;
@@ -63,6 +89,11 @@ namespace MyServiceBus.Abstractions.QueueIndex
         {
             return id >= FromId -1  && id <= ToId + 1;
         }
+
+        public bool HasMessage(long id)
+        {
+            return id >= FromId  && id <= ToId ;
+        }
         
         public bool IsEmpty()
         {
@@ -74,6 +105,11 @@ namespace MyServiceBus.Abstractions.QueueIndex
         public static QueueIndexRange Create(long fromId, long toId)
         {
             return new QueueIndexRange(fromId, toId);
+        }
+        
+        public static QueueIndexRange CreateWithValue(long messageId)
+        {
+            return new QueueIndexRange(messageId, messageId);
         }
 
         public bool IsBefore(long messageId)
@@ -95,6 +131,18 @@ namespace MyServiceBus.Abstractions.QueueIndex
         {
             for (var i = FromId; i <= ToId; i++)
                 yield return i;
+        }
+
+        public bool TryJoinWithTheNextOne(QueueIndexRange nextEl)
+        {
+            if (ToId + 1 == nextEl.FromId)
+            {
+                ToId = nextEl.ToId;
+                return true;
+            }
+
+            return false;
+
         }
     }
 }

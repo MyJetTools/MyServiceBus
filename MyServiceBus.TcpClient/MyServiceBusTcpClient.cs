@@ -50,21 +50,21 @@ namespace MyServiceBus.TcpClient
 
 
         public void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
-            Func<IMyServiceBusMessage, ValueTask> callback)
+            Func<IMyServiceBusMessage, ValueTask> callback, bool enableDeDublication = false)
         {
             var id = MyServiceBusTcpContext.GetId(topicId, queueId);
 
             _subscribers.Add(id,
-                new SubscriberInfo(Log, topicId, queueId, topicQueueType, callback, null));
+                new SubscriberInfo(Log, topicId, queueId, topicQueueType, callback, null, enableDeDublication));
         }
 
         public void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
-            Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callback)
+            Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callback, bool enableDeDublication = false)
         {
             var id = MyServiceBusTcpContext.GetId(topicId, queueId);
 
             _subscribers.Add(id,
-                new SubscriberInfo(Log, topicId, queueId, topicQueueType, null, callback));
+                new SubscriberInfo(Log, topicId, queueId, topicQueueType, null, callback, enableDeDublication));
         }
 
 

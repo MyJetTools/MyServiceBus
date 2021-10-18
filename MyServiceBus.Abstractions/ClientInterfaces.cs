@@ -15,10 +15,11 @@ namespace MyServiceBus.Abstractions
     public interface IMyServiceBusSubscriber
     {
         void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
-            Func<IMyServiceBusMessage, ValueTask> callback);
+            Func<IMyServiceBusMessage, ValueTask> callback, bool enableDeDublication = false);
 
         void Subscribe(string topicId, string queueId, TopicQueueType topicQueueType,
-            Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callback);
+            Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callback,
+            bool enableDeDublication = false);
     }
     
 }

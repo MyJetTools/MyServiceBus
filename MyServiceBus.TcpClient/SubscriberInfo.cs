@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
@@ -13,8 +14,12 @@ namespace MyServiceBus.TcpClient
     {
         private readonly IMyServiceBusLogInvoker _log;
 
+
+        private readonly MessageDeDublicator _messageDeDublicator;
+
         public SubscriberInfo(IMyServiceBusLogInvoker log, string topicId, string queueId, TopicQueueType queueType, 
-            Func<IMyServiceBusMessage, ValueTask> callbackAsOneMessage, Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callbackAsAPackage)
+            Func<IMyServiceBusMessage, ValueTask> callbackAsOneMessage,
+            Func<IConfirmationContext, IReadOnlyList<IMyServiceBusMessage>, ValueTask> callbackAsAPackage, bool enableDedublicator)
         {
             _log = log;
             TopicId = topicId;
@@ -22,6 +27,11 @@ namespace MyServiceBus.TcpClient
             QueueType = queueType;
             CallbackAsOneMessage = callbackAsOneMessage;
             CallbackAsAPackage = callbackAsAPackage;
+            
+            if (enableDedublicator)
+            {
+                _messageDeDublicator = new MessageDeDublicator();
+            }
         }
 
         public string TopicId { get; }
@@ -38,25 +48,38 @@ namespace MyServiceBus.TcpClient
             if (CallbackAsOneMessage == null)
                 return;
             
-            QueueWithIntervals result = null;
+            QueueWithIntervals okMessages = null;
 
             try
             {
                 foreach (var message in messages)
                 {
+
+                    if (_messageDeDublicator != null)
+                    {
+                        if (_messageDeDublicator.HasMessage(message.Id))
+                        {
+                            okMessages ??= new QueueWithIntervals();
+                            okMessages.Enqueue(message.Id);
+                            continue;
+                        }
+                            
+                    }
+
                     await CallbackAsOneMessage(message);
 
-                    result ??= new QueueWithIntervals();
-                    result.Enqueue(message.Id);
+                    okMessages ??= new QueueWithIntervals();
+                    okMessages.Enqueue(message.Id);
                 }
             }
             catch (Exception e)
             {
                 _log.InvokeLogException(e);
-                if (result == null)
+                if (okMessages == null)
                     confirmAllReject();
                 else
-                    confirmSomeMessagesAreOk(result);
+                    confirmSomeMessagesAreOk(okMessages);
+                    
                 return;
             }
 
@@ -69,9 +92,13 @@ namespace MyServiceBus.TcpClient
             if (CallbackAsAPackage == null)
                 return;
 
+            if (_messageDeDublicator != null)
+                messages = messages.Where(msg => _messageDeDublicator.HasMessage(msg.Id)).ToList();
+
             try
             {
                 await CallbackAsAPackage(confirmationContext, messages);
+                _messageDeDublicator?.NewConfirmedMessages(messages.Select(itm => itm.Id));
                 confirmAllOk();
             }
             catch (Exception e)

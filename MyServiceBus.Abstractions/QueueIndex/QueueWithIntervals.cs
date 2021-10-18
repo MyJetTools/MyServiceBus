@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 
 namespace MyServiceBus.Abstractions.QueueIndex
 {
@@ -13,32 +14,17 @@ namespace MyServiceBus.Abstractions.QueueIndex
                 _ranges.Add(new QueueIndexRange(queueIndexRange));
             
             if (_ranges.Count == 0)
-            {
-                _ranges.Add(new QueueIndexRange(0));
-            }
+                _ranges.Add(QueueIndexRange.CreateEmpty(0));
         }
         
         public QueueWithIntervals(long messageId = 0)
         {
-            _ranges.Add(new QueueIndexRange(messageId));
+            _ranges.Add(QueueIndexRange.CreateEmpty(messageId));
         }
 
         private readonly List<QueueIndexRange> _ranges = new List<QueueIndexRange>();
 
-        private int GetIndexToInsert(long messageId)
-        {
-            var i = 0;
 
-            foreach (var range in _ranges)
-            {
-                if (range.IsBefore(messageId))
-                    return i;
-
-                i++;
-            }
-
-            return i;
-        }
 
         private int GetIndexToDelete(long messageId)
         {
@@ -56,39 +42,72 @@ namespace MyServiceBus.Abstractions.QueueIndex
             return -1;
         }
 
-        private QueueIndexRange GetInterval(long messageId)
-        {
-
-            if (_ranges.Count == 1)
-            {
-                var firstOne = _ranges[0];
-                if (firstOne.IsEmpty() || firstOne.IsMyInterval(messageId))
-                    return firstOne;
-            }
-
-            foreach (var range in _ranges)
-            {
-                if (range.IsMyInterval(messageId))
-                    return range;
-            }
-
-            var index = GetIndexToInsert(messageId);
-
-            var newItem = new QueueIndexRange(0);
-
-            if (index >= _ranges.Count)
-                _ranges.Add(newItem);
-            else
-                _ranges.Insert(index, newItem);
-
-            return newItem;
-
-        }
 
         public void Enqueue(long messageId)
         {
-            var interval = GetInterval(messageId);
-            interval.AddNextMessage(messageId);
+            const int defaultValue = -1; 
+
+            if (_ranges.Count == 0)
+            {
+                _ranges.Add(QueueIndexRange.CreateWithValue(messageId));
+                return;
+            }
+            
+            if (_ranges.Count == 1)
+            {
+                var firstItem = _ranges[0];
+                if (firstItem.IsEmpty())
+                {
+                    firstItem.FromId = messageId;
+                    firstItem.ToId = messageId;
+                        return;
+                }
+            }
+
+            var foundIndex = defaultValue;
+
+            for (var index = 0; index < _ranges.Count; index++)
+            {
+                var el = _ranges[index];
+
+                if (el.TryJoin(messageId))
+                {
+                    foundIndex = index;
+                    break;
+                }
+
+                if (messageId < el.FromId - 1)
+                {
+                    var newItem = QueueIndexRange.CreateWithValue(messageId);
+                    _ranges.Insert(index, newItem);
+                    foundIndex = index;
+                    break;
+                }
+            }
+
+            if (foundIndex == defaultValue)
+            {
+                var newItem = QueueIndexRange.CreateWithValue(messageId);
+                _ranges.Add(newItem);
+                return;
+            }
+
+            if (foundIndex > 0)
+            {
+                var currentEl = _ranges[foundIndex];
+                var previousEl = _ranges[foundIndex-1];
+                if (previousEl.TryJoinWithTheNextOne(currentEl))
+                    _ranges.RemoveAt(foundIndex);
+            }
+
+            if (foundIndex < _ranges.Count - 1)
+            {
+                var nextEl = _ranges[foundIndex + 1];
+                var currentEl = _ranges[foundIndex];
+                
+                if (currentEl.TryJoinWithTheNextOne(nextEl))
+                    _ranges.RemoveAt(foundIndex+1);
+            }
 
         }
 
@@ -103,7 +122,7 @@ namespace MyServiceBus.Abstractions.QueueIndex
             if (interval.IsEmpty())
                 return -1;
 
-            var result = interval.GetNextMessage();
+            var result = interval.Dequeue();
 
             if (interval.IsEmpty() && _ranges.Count > 1)
                 _ranges.RemoveAt(0);
@@ -182,6 +201,11 @@ namespace MyServiceBus.Abstractions.QueueIndex
                 _ranges.RemoveAt(0);
 
             _ranges[0].FromId = _ranges[0].ToId+1;
+        }
+
+        public bool HasMessage(long id)
+        {
+            return _ranges.Any(range => range.HasMessage(id));
         }
     }
 }

@@ -86,7 +86,7 @@ namespace MyServiceBus.Abstractions.Tests
         [Test]
         public void TestSimpleCase()
         {
-            var messagesRange = new QueueIndexRange(-1);
+            var messagesRange = QueueIndexRange.CreateEmpty();
 
             messagesRange.AddNextMessage(1);
 
@@ -98,12 +98,12 @@ namespace MyServiceBus.Abstractions.Tests
             Assert.AreEqual(1, messagesRange.FromId);
             Assert.AreEqual(2, messagesRange.ToId);
 
-            var message = messagesRange.GetNextMessage();
+            var message = messagesRange.Dequeue();
 
             Assert.AreEqual(1, message);
             Assert.IsFalse(messagesRange.IsEmpty());
 
-            message = messagesRange.GetNextMessage();
+            message = messagesRange.Dequeue();
 
             Assert.AreEqual(2, message);
             Assert.IsTrue(messagesRange.IsEmpty());
@@ -136,7 +136,7 @@ namespace MyServiceBus.Abstractions.Tests
         [Test]
         public void TestBrokenSequence()
         {
-            var queue = new QueueWithIntervals(-1);
+            var queue = new QueueWithIntervals();
 
             queue.Enqueue(100);
             queue.Enqueue(99);
@@ -176,6 +176,35 @@ namespace MyServiceBus.Abstractions.Tests
 
             messageId = queue.Dequeue();
             Assert.AreEqual(-1, messageId);
+        }
+
+        [Test]
+        public void TestHasMessage()
+        {
+            var queue = new QueueWithIntervals();
+            
+            queue.Enqueue(100);
+            queue.Enqueue(101);
+            queue.Enqueue(102);
+            queue.Enqueue(200);
+            queue.Enqueue(201);
+            queue.Enqueue(202);
+            
+            Assert.IsTrue(queue.HasMessage(100));
+            Assert.IsTrue(queue.HasMessage(101));
+            Assert.IsTrue(queue.HasMessage(102));
+            
+            Assert.IsTrue(queue.HasMessage(200));
+            Assert.IsTrue(queue.HasMessage(201));
+            Assert.IsTrue(queue.HasMessage(202));
+            
+            Assert.IsFalse(queue.HasMessage(99));
+            Assert.IsFalse(queue.HasMessage(103));
+            Assert.IsFalse(queue.HasMessage(199));
+            Assert.IsFalse(queue.HasMessage(203));
+            Assert.IsFalse(queue.HasMessage(204));
+
+            
         }
 
     }
