@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using MyServiceBus.Abstractions;
 using MyServiceBus.Abstractions.QueueIndex;
@@ -17,6 +18,8 @@ namespace MyServiceBus.TcpClient
         private readonly Dictionary<string, SubscriberInfo> _subscribers;
         private readonly string _name;
         private readonly Func<IReadOnlyList<(string topicName, int maxCachedSize)>> _checkAndCreateTopicOnConnect;
+
+        private bool _handleMessageInProcess = false;
 
 
         private object _lockObject;
@@ -54,18 +57,33 @@ namespace MyServiceBus.TcpClient
 
         private void HandleDisconnect()
         {
-            while (_publishTasks.Count >0)
+            var list = new List<TaskCompletionSource<int>>();
+
+            lock (_publishTasks)
             {
-                var first = _publishTasks.Keys.First();
-                    
-                if (_publishTasks.Remove(first, out var result))
-                    result.SetException(new PublishFailException( PublishFailReason.Disconnected, "Disconnection occured during the publish flow"));
+                while (_publishTasks.Count > 0)
+                {
+                    var first = _publishTasks.Keys.First();
+
+                    if (_publishTasks.Remove(first, out var result))
+                        list.Add(result);
+                }
+            }
+
+            foreach (var task in list)
+            {
+                task.SetException(new PublishFailException( PublishFailReason.Disconnected, "Disconnection occured during the publish flow"));
             }
         }
         
         protected override ValueTask OnDisconnectAsync()
         {
             _disconnected = true;
+
+            while (_handleMessageInProcess)
+            {
+                Thread.Sleep(1000);
+            }
             
             var lockObject = _lockObject;
             if (lockObject != null)
@@ -86,28 +104,43 @@ namespace MyServiceBus.TcpClient
 
         private void HandlePublishResponse(PublishResponseContract pr)
         {
+            TaskCompletionSource<int> task = null;
             lock (_publishTasks)
             {
                 if (_publishTasks.Remove(pr.RequestId, out var result))
-                    result.SetResult(0);
+                    task = result;
             }
+            
+            task?.SetResult(0);
         }
 
         protected override ValueTask HandleIncomingDataAsync(IServiceBusTcpContract data)
         {
-
-            switch (data)
+            _handleMessageInProcess = true;
+            try
             {
-                case NewMessagesContract newMsg:
-                    HandleNewMessages(newMsg);
-                    break;
+                if (_disconnected)
+                {
+                    throw new Exception("tcpSocket is disconnected");
+                }
 
-                case PublishResponseContract pr:
-                    HandlePublishResponse(pr);
-                    break;
+                switch (data)
+                {
+                    case NewMessagesContract newMsg:
+                        HandleNewMessages(newMsg);
+                        break;
 
-                case RejectConnectionContract rejectContract:
-                    throw new Exception("Reject from server: " + rejectContract.Message);
+                    case PublishResponseContract pr:
+                        HandlePublishResponse(pr);
+                        break;
+
+                    case RejectConnectionContract rejectContract:
+                        throw new Exception("Reject from server: " + rejectContract.Message);
+                }
+            }
+            finally
+            {
+                _handleMessageInProcess = false;
             }
 
             return new ValueTask();
@@ -262,7 +295,11 @@ namespace MyServiceBus.TcpClient
                 throw new Exception("Disconnected");
 
             var task = new TaskCompletionSource<int>();
-            _publishTasks.Add(contract.RequestId, task);
+
+            lock (_publishTasks)
+            {
+                _publishTasks.Add(contract.RequestId, task);   
+            }
 
             SendDataToSocket(contract);
 
